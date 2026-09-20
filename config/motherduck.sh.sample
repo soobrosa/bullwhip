@@ -1,0 +1,6 @@
+# MotherDuck connector config — same DuckDB driver, md: path + token.
+
+export DIALECT="motherduck"
+export MOTHERDUCK_TOKEN=""
+export DATABASE="my_db"
+# dlt destination path will be md:<DATABASE>?motherduck_token=<MOTHERDUCK_TOKEN>

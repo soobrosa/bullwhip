@@ -1,0 +1,6 @@
+# BigQuery connector config.
+
+export DIALECT="bigquery"
+export GOOGLE_APPLICATION_CREDENTIALS=""
+export BIGQUERY_PROJECT=""
+export DATABASE="my_dataset"

@@ -1,0 +1,128 @@
+# bullwhip
+
+> Nightly batch data-pipeline framework: cron + GNU Make + dlt-ops + SQLMesh.
+> Modernized from the 2013 Wunderlist data pipeline. Three ledgers, three
+> read-only projections, one cron line.
+
+## What it is
+
+bullwhip is a skeleton for nightly batch data pipelines. It uses cron for
+scheduling, GNU Make for the cross-system DAG, dlt-ops for EL with data quality
+gates, and SQLMesh for in-warehouse transforms. No scheduler daemon, no
+workers, no web server — just a makefile and a cron line.
+
+## Architecture
+
+```
+cron (every 30 min, 00:00–06:00)
+  └─ run_workflow.sh          single-flight, bounded attempts, attempt logs
+       └─ make -k -j N        the ONLY place cross-system edges exist
+            ├─ dlt-ops pipeline run     (ingest + assertions + ledger)
+            ├─ dlt-ops pipeline reconcile (schema-drift detection)
+            ├─ sqlmesh run               (transforms)
+            ├─ exports / backups         (fingerprint-gated markers)
+            └─ notifications
+```
+
+## Key files
+
+- `lib/run_workflow.sh` — cron entry point, retry loop, status.json heartbeat, logs/index.json night index
+- `.github/workflows/nightly.yml` — GitHub Actions as the cron: daily 03:00 UTC, state in actions/cache, secrets via env, dashboards to GitHub Pages
+- `scripts/build_site.sh` — assembles web/ + a project's logs/ into a static site (what the Action publishes)
+- `lib/boilerplate.mk` — make boilerplate, dated targets, tracking shell
+- `lib/tracking_shell.py` — vendored, self-contained, writes timing_env.log
+- `lib/connections.py` — connector registry (DuckDB, MotherDuck, BigQuery, ClickHouse)
+- `lib/run_pipeline.py` — thin dlt wrapper (fallback for simple cases)
+- `lib/dlt_ops_fallback.py` — escape hatch if dlt-ops breaks
+- `lib/critical_path.py` — Mara organ 1: critical-path priority, .WAIT waves, dag.json
+- `lib/fingerprint.py` — Mara organ 2: content-hash cache keys
+- `lib/run_ledger.py` — outcome record: dlt-ops runs + DuckDB row counts → logs/<date>/ledger.json
+- `lib/warehouse_parquet.py` — parquet export/restore: data/*.parquet is the durable copy, warehouse.duckdb is ephemeral and rebuilt from it
+- `lib/notify_slack.py` — Slack failure ping + morning digest
+- `.dlt/config.toml` — dlt-ops project config
+- `sqlmesh/config.yaml` — SQLMesh gateway config
+- `sqlmesh/models/` — SQL models with audits
+- `sqlmesh/macros/` — Python macros
+- `web/` — static dashboards (plain HTML + vanilla JS, no build step, relative paths so they work from any static host; six views over one night's artifacts)
+- `mcp/` — TypeScript MCP server (6 read-only tools, stdio transport)
+- `examples/github-health/` — primary example: GitHub trending-repo health tracker
+- `examples/incremental_load/` — minimal example: people table ingest + transform
+
+## Division of labor
+
+| Concern | Owner |
+|---|---|
+| Cadence, retries, locking, attempt logs | cron (or GitHub Actions) + run_workflow.sh |
+| DAG across heterogeneous steps | make |
+| Dependency graph inside the warehouse | SQLMesh |
+| Incremental state, backfills, restatements | dlt-ops (ingest) / SQLMesh (transform) |
+| Data quality | dlt-ops assertions + SQLMesh audits |
+| EL ops (validate, gates, ledger, checkpoints, drift) | dlt-ops |
+| Metaprogramming | SQLMesh macros + Python models |
+| Priority + content sensitivity at the make layer | critical_path.py + fingerprint.py |
+| Observability / notification / agent access | UI, Slack, MCP (read-only projections) |
+
+## The three ledgers
+
+| Ledger | What it answers | Where |
+|---|---|---|
+| timing_env.log | What ran at 3am and how long | logs/<date>/timing_env.log |
+| dlt-ops state | Which source window is loaded + run outcomes | warehouse.duckdb _dlt_ops_runs |
+| SQLMesh state | Which transform intervals are complete | warehouse.duckdb .sqlmesh/ |
+
+## The three projections (read-only, no new state)
+
+- HTML (live + archive): six dashboards (Flask-port Gantt, Plot+ELK DAG, outcome ledger, monochrome vitals, plus two monochrome reductions) served from web/
+- Slack: failure ping (v0) + morning digest (v1)
+- MCP (stdio): night_status, night_stats, list_targets, night_summary, get_target_log, explain_critical_path
+
+## Quick start
+
+```bash
+pip install -e ".[dev]"
+cd examples/github-health
+GITHUB_HEALTH_FIXTURE=1 make imports
+make query
+```
+
+See docs/tutorial.md for the full walkthrough.
+
+## Lineage
+
+- night-shift (soobrosa, 2013) — the whole shape: cron + make, run_workflow.sh, boilerplate.mk, dated markers, timing_env.log, attempt logs (https://github.com/soobrosa/night-shift)
+- trackingshell (Wunderlist) — lib/tracking_shell.py is a self-contained rewrite of its make-shell idea (https://github.com/wunderlist/trackingshell)
+- Mara (mara-pipelines) — the three organs: critical-path priority, content-hash cache keys, and the outcome record (https://github.com/mara/mara-pipelines)
+- dataroom (soobrosa) — the monochrome dashboard language of D, E and F (https://github.com/soobrosa/dataroom)
+
+## Dependencies
+
+Runtime, Python (pyproject.toml):
+- dlt (dlt[duckdb]) by dltHub — extract + load; the github_health source, schema inference, merge loads
+- dlt-ops — project validation, pipeline run, runs ledger _dlt_ops_runs, schema-drift reconcile, backfill
+- SQLMesh (sqlmesh[duckdb]) by Tobiko Data — transform models, intervals, audits, plan/run
+- DuckDB by DuckDB Foundation / DuckDB Labs — the single warehouse file both tools share
+- Optional extras: dlt[postgres], dlt[bigquery] + google-cloud-bigquery, dlt[clickhouse] + clickhouse-connect
+
+Runtime, non-Python:
+- GNU Make — the DAG; 3.81 (macOS) works, 4.4+ for .WAIT waves
+- bash + cron, or GitHub Actions — cadence
+- uv (Astral) — dependency install in the Action
+- GitHub REST API — the example's data source (GITHUB_TOKEN, PAT, or GITHUB_HEALTH_FIXTURE=1 for none)
+- Slack incoming webhooks — optional failure ping / morning digest
+- Python 3.11+
+
+Dashboards and agent access:
+- Observable Plot (@observablehq/plot@0.4, jsDelivr) — dashboard B's Gantt
+- elkjs (elkjs@0.8.2, jsDelivr) — dashboard B's DAG layout
+- @modelcontextprotocol/sdk — mcp/ server (TypeScript)
+- Any static file server / GitHub Pages — the dashboards are plain HTML + vanilla JS
+
+Dev only: pytest, pytest-cov, TypeScript + @types/node (mcp), Homebrew make, headless Chrome (docs/visuals/ screenshots)
+
+## Failure semantics
+
+- Every worker is a subprocess with exit codes; make composes them
+- dlt-ops commits atomically per load before its marker lands
+- Single-flight (ps check) prevents overlapping sqlmesh run at cron frequency
+- Green-marker ≠ green-data: dlt-ops gates judge data before it loads; SQLMesh audits judge after
+- data/*.parquet is the source of truth; warehouse.duckdb is rebuilt from it whenever missing (re-ingest is idempotent, models re-materialise)

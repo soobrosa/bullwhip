@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>bullwhip · outcome ledger</title>
+<style>
+  /* Mara-style outcome record: a run ledger, not a wall of green. */
+  * { box-sizing: border-box; padding: 0; margin: 0; }
+  body { font-family: Helvetica Neue, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 21px; color: #2c3e50; }
+  header { background: #34495e; padding: 5px 20px; height: 41px; display: flex; align-items: center; justify-content: space-between; }
+  header a { font-size: 15px; text-transform: uppercase; color: #fff; text-decoration: none; }
+  header .meta { color: #ecf0f1; font-size: 12px; }
+  select { font: inherit; }
+  section { margin: 25px; }
+  h1 { font-size: 26px; font-weight: 300; margin-bottom: 4px; }
+  h2 { font-weight: 300; margin: 25px 0 6px 0; }
+  .sub { color: #7f8c8d; font-size: 13px; }
+  .state { display: inline-block; padding: 0 8px; border-radius: 2px; color: #fff; font-size: 12px; }
+  .state.success { background: #2ecc71; } .state.failed { background: #e74c3c; }
+  .state.running { background: #f39c12; } .state.other { background: #95a5a6; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #ecf0f1; font-size: 13px; }
+  th { font-weight: 600; color: #7f8c8d; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; }
+  tr:hover td { background: #f8f9f9; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ok { color: #2ecc71; font-weight: bold; }
+  .bad { color: #e74c3c; font-weight: bold; }
+  .warn { color: #f39c12; font-weight: bold; }
+  .muted { color: #95a5a6; }
+  code { font-family: Courier, monospace; font-size: 12px; background: #ecf0f1; padding: 1px 4px; border-radius: 2px; }
+  .disagree { outline: 2px solid #e74c3c; outline-offset: -2px; }
+  .callout { border-left: 4px solid #e74c3c; background: #fdf0ef; padding: 10px 14px; margin-top: 12px; font-size: 13px; }
+  .callout.ok { border-color: #2ecc71; background: #eafaf1; }
+  .err { color: #e74c3c; font-family: Courier, monospace; font-size: 11px; white-space: pre-wrap; word-break: break-word; }
+</style>
+</head>
+<body>
+<header>
+  <a href="./">bullwhip</a>
+  <span class="meta" id="meta"></span>
+</header>
+<section>
+  <h1>Outcome Ledger <span id="state" class="state other"></span></h1>
+  <div class="sub" id="sub"></div>
+  <div id="disagree"></div>
+
+  <h2>Make targets — did the commands pass?</h2>
+  <table id="targets">
+    <thead><tr>
+      <th>Target</th><th>Started</th><th class="num">Duration</th><th class="num">Exit</th>
+      <th class="num">Commands</th><th class="num">Critical path</th><th>dlt-ops runs in window</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>dlt-ops ledger — did the data arrive?</h2>
+  <table id="runs">
+    <thead><tr>
+      <th>Status</th><th>Started</th><th class="num">Extracted</th><th class="num">Loaded</th>
+      <th>Resource</th><th>Run ID</th><th>Error</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>Warehouse tables — what does the warehouse hold now?</h2>
+  <table id="tables">
+    <thead><tr><th>Table</th><th class="num">Rows</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<script type="module">
+import { loadNight, autoRefresh, nightPicker, gotoNight, stateLabel, fmtTime, fmtSecs, fmtInt, el } from "./shared.js";
+
+const $ = (id) => document.getElementById(id);
+const LONGEST = (t) => t.longest_downstream > 0;
+
+function fill(tbody, rows) {
+  tbody.textContent = "";
+  for (const r of rows) tbody.append(r);
+}
+
+autoRefresh(async (night) => {
+  const s = $("state");
+  s.className = `state ${["success", "failed"].includes(night.state) ? night.state : "other"}`;
+  s.textContent = stateLabel(night.state);
+  $("meta").textContent = "";
+  $("meta").append(`night ${night.date} · `, nightPicker(night.date, gotoNight));
+  $("sub").textContent = night.started
+    ? `make window ${fmtTime(night.started)} – ${fmtTime(night.finished || night.now)} · exit ${night.status?.make_exit ?? "?"}`
+    : "no make activity recorded";
+
+  // --- make targets ---
+  const crit = new Set();
+  if (night.criticalPath) for (const t of night.dag) if (t.longest_downstream >= night.criticalPath.longest_downstream && t.depth >= (night.criticalPath?.depth ?? 0)) crit.add(t.id);
+  fill($("targets").querySelector("tbody"), night.targets.map((t) => {
+    const dagT = night.dag.find((d) => d.id === t.id);
+    const ledgerBits = (t.ledgerRuns || []).map((r) => `${r.status}${r.records_loaded != null ? ` · ${fmtInt(r.records_loaded)} rows` : ""}`);
+    return el("tr", { class: t.state === "failed" ? "disagree" : null }, [
+      el("td", {}, t.short),
+      el("td", {}, fmtTime(t.started)),
+      el("td", { class: "num" }, fmtSecs(t.duration)),
+      el("td", { class: `num ${t.state === "failed" ? "bad" : t.state === "running" ? "warn" : "ok"}` }, t.exit ?? "…"),
+      el("td", { class: "num" }, String(t.commands.length)),
+      el("td", { class: "num muted" }, dagT && LONGEST(dagT) ? `${fmtSecs(dagT.longest_downstream)}` : ""),
+      el("td", {}, ledgerBits.length ? ledgerBits.join(", ") : el("span", { class: "muted" }, "—")),
+    ]);
+  }));
+
+  // --- the Mara point: exit 0 is not data success ---
+  const dis = $("disagree");
+  dis.textContent = "";
+  const ledgerFailed = (night.ledger?.runs || []).filter((r) => r.status !== "completed");
+  if (night.state === "success" && ledgerFailed.length) {
+    dis.append(el("div", { class: "callout" },
+      `make exited 0, but ${ledgerFailed.length} dlt-ops run(s) did not complete. Task success is not data success.`));
+  } else if (night.state === "success") {
+    dis.append(el("div", { class: "callout ok" },
+      `make exited 0 and the ledger agrees: ${(night.ledger?.runs || []).length} run(s) completed, ${fmtInt(night.ledger?.records_loaded ?? 0)} records loaded.`));
+  } else if (night.state === "failed") {
+    dis.append(el("div", { class: "callout" },
+      `make exited ${night.status?.make_exit}. First failure: ${night.failedTargets[0]?.short ?? "?"} — see log debugging.`));
+  }
+
+  // --- dlt-ops runs ---
+  fill($("runs").querySelector("tbody"), (night.ledger?.runs || []).map((r) =>
+    el("tr", {}, [
+      el("td", { class: r.status === "completed" ? "ok" : "bad" }, r.status),
+      el("td", {}, new Date(r.started_at).toLocaleTimeString()),
+      el("td", { class: "num" }, fmtInt(r.records_extracted)),
+      el("td", { class: "num" }, fmtInt(r.records_loaded)),
+      el("td", {}, r.resource_name || r.source_section || "—"),
+      el("td", {}, el("code", {}, (r.run_id || "").slice(0, 12))),
+      el("td", {}, r.error_summary ? el("div", { class: "err" }, r.error_summary.split("\n").pop()) : "—"),
+    ]))
+  );
+  if (!(night.ledger?.runs || []).length) {
+    fill($("runs").querySelector("tbody"), [el("tr", {}, el("td", { colspan: 7, class: "muted" }, "no dlt-ops runs in this night's window (or no ledger.json)"))]);
+  }
+
+  // --- warehouse row counts ---
+  const tables = Object.entries(night.ledger?.tables || {});
+  fill($("tables").querySelector("tbody"), tables.map(([t, n]) =>
+    el("tr", {}, [el("td", {}, el("code", {}, t)), el("td", { class: "num" }, fmtInt(n))]))
+  );
+  if (!tables.length) {
+    fill($("tables").querySelector("tbody"), [el("tr", {}, el("td", { colspan: 2, class: "muted" }, "no warehouse snapshot (ledger.json missing or duckdb unreadable)"))]);
+  }
+});
+</script>
+</body>
+</html>

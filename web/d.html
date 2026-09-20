@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>bullwhip · run</title>
+<style>
+  /* Option D: dataroom dashboard language, ported to the night's artifacts.
+     Tokens from soobrosa/dataroom web/dashboard.html. */
+  :root { --bg:#ffffff; --fg:#000000; --mut:#666; --line:#000; --soft:#e5e5e5; --fill:#000; }
+  @media (prefers-color-scheme: dark){ :root{ --bg:#000; --fg:#fff; --mut:#999; --line:#fff; --soft:#222; --fill:#fff; } }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.45;overflow-x:hidden}
+  a{color:inherit}
+  .wrap{width:100%;max-width:none;margin:0;padding:20px 28px;min-width:0}
+  header{display:flex;justify-content:space-between;align-items:baseline;
+    border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:0}
+  h1{font-size:14px;font-weight:600;letter-spacing:.04em;margin:0;text-transform:uppercase}
+  .meta{color:var(--mut);font-size:11px}
+  .dot{display:inline-block;width:7px;height:7px;border:1px solid var(--line);margin-right:6px;vertical-align:middle}
+  .dot.on{background:var(--fill)}
+  .blink{animation:b 1s steps(2) infinite}
+  @keyframes b{50%{opacity:.2}}
+  .banner{border:1px solid var(--line);border-left-width:4px;padding:8px 12px;margin:0;
+    border-bottom:none;font-size:12px;display:none;overflow-wrap:anywhere}
+  .banner b{letter-spacing:.04em}
+  select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line)}
+  .hero{display:grid;grid-template-columns:1fr 1fr;gap:0;
+    border-left:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .hero > div{border-right:1px solid var(--line);padding:18px 16px;min-width:0}
+  .prog .k,.now .k{color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+  .prog .pcttop{display:flex;align-items:baseline;gap:10px}
+  .pbar{height:18px;border:1px solid var(--line);position:relative;margin-top:10px;overflow:hidden}
+  .pbar > i{position:absolute;left:0;top:0;bottom:0;background:var(--fill);width:0%}
+  .pbar.hatch > i{background:repeating-linear-gradient(45deg,var(--fill) 0 4px,transparent 4px 8px)}
+  #proglabel{display:block;margin-top:8px}
+  .now .nowline{font-size:13px;overflow-wrap:anywhere;min-height:1.45em}
+  .now .nowline .t{color:var(--mut);margin-right:8px}
+  .now .gen{margin-top:8px;font-size:11px;color:var(--mut)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0;
+    border-left:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .cell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+    padding:14px 16px;min-width:0;overflow:hidden}
+  .cell.errcell{display:none}
+  .cell.errcell.has{display:block;order:9;grid-column:1/-1;border-left:4px solid var(--line)}
+  .k{color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+  .big{font-size:26px;font-weight:600;letter-spacing:-.01em;line-height:1}
+  .sub{color:var(--mut);font-size:11px;margin-top:2px}
+  .bar{height:14px;border:1px solid var(--line);position:relative;margin-top:10px;overflow:hidden}
+  .bar > i{position:absolute;left:0;top:0;bottom:0;background:var(--fill);width:0%}
+  .dist{margin-top:4px}
+  .row{display:flex;align-items:center;gap:8px;margin:3px 0}
+  .row .name{width:150px;max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .track{flex:1;height:10px;border:1px solid var(--line);position:relative}
+  .row .track > i{position:absolute;left:0;top:0;bottom:0;background:var(--fill)}
+  .row .track.hatch > i{background:repeating-linear-gradient(45deg,var(--fill) 0 3px,transparent 3px 6px)}
+  .row .track.miss > i{background:transparent}
+  .row .n{width:70px;text-align:right;color:var(--mut)}
+  .panel{padding:14px 16px;border-bottom:1px solid var(--line)}
+  .feed{margin:0;list-style:none;padding:0;max-height:min(34vh,360px);overflow:auto;font-size:12px}
+  .feed li{display:flex;gap:8px;padding:1px 0;white-space:nowrap;min-width:0}
+  .feed li .t{color:var(--mut);width:70px;flex:none}
+  .feed li .v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .feed li.live .v{font-weight:600;white-space:normal;overflow:visible}
+  .feed li.bad .v{font-weight:700}
+  .errs{margin:0;list-style:none;padding:0;max-height:min(34vh,300px);overflow:auto;font-size:12px}
+  .errs li{border-left:3px solid var(--line);padding:2px 0 2px 8px;margin:3px 0;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .errs li .g{font-weight:700;margin-right:6px}
+  .empty{color:var(--mut);font-size:11px}
+  pre.tree{margin:0;white-space:pre;overflow:auto;max-height:min(62vh,760px);font-size:12px}
+  .tree .d{font-weight:600}
+  .tree .s{color:var(--mut)}
+  .tree .f{cursor:pointer;text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+  .tree .f:hover{background:var(--soft)}
+  .tree .f.sel{background:var(--fill);color:var(--bg)}
+  .split{display:grid;grid-template-columns:minmax(260px,38%) 1fr;gap:0;padding:0}
+  .treecol{padding:14px 16px;border-right:1px solid var(--line);min-width:0}
+  .prevcol{padding:14px 16px;min-width:0;overflow:hidden}
+  .prev{margin-top:6px;max-height:min(62vh,760px);overflow:auto}
+  .prev pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5}
+  .banner + .hero{border-top:none}
+  @media(max-width:760px){
+    .hero{grid-template-columns:1fr}
+    .hero > div{border-right:none;border-bottom:1px solid var(--line)}
+    .split{grid-template-columns:1fr}
+    .treecol{border-right:none;border-bottom:1px solid var(--line)}
+    pre.tree,.prev{max-height:40vh}}
+  .foot{display:flex;justify-content:space-between;color:var(--mut);font-size:11px;padding-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><a href="./">bullwhip</a></h1>
+    <div class="meta"><span id="meta"></span> · <span id="st"><span class="dot blink"></span>connecting</span></div>
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <div class="hero">
+    <div class="prog">
+      <div class="k">progress</div>
+      <div class="pcttop"><span class="big" id="pct">–</span><span id="progcount" class="sub"></span></div>
+      <div class="pbar" id="pbar"><i></i></div>
+      <span id="proglabel"></span>
+    </div>
+    <div class="now">
+      <div class="k">now</div>
+      <div class="nowline" id="nowline"><span class="t">–:–</span>idle</div>
+      <div class="gen" id="nowgen"></div>
+    </div>
+  </div>
+
+  <div class="grid" id="vitals"></div>
+
+  <div class="panel">
+    <div class="k">activity — timing_env.log</div>
+    <ul class="feed" id="feed"></ul>
+  </div>
+
+  <div class="split">
+    <div class="treecol">
+      <div class="k">logs — <span id="treedir"></span></div>
+      <pre class="tree" id="tree"></pre>
+    </div>
+    <div class="prevcol">
+      <div class="k">preview</div>
+      <div class="prev"><pre id="prev">select a log from the tree</pre></div>
+    </div>
+  </div>
+
+  <div class="foot"><span id="foot-l"></span><span>bullwhip · static dashboard, no server state</span></div>
+</div>
+
+<script type="module">
+import { loadNight, autoRefresh, nightPicker, gotoNight, nightState, stateLabel, fmtTime, fmtSecs, fmtInt, durationOf, criticalChain, el } from "./shared.js";
+
+const $ = (id) => document.getElementById(id);
+const stateChar = { success: "■", failed: "■", running: "□", starting: "□", finished: "■", "no-data": "·" };
+
+function cell(k, big, sub) {
+  return el("div", { class: "cell" }, el("div", { class: "k" }, k), el("div", { class: "big" }, big), sub ? el("div", { class: "sub" }, sub) : null);
+}
+
+// Gantt, dataroom-style: one hairline per make-level command, hatch = running.
+function ganttBlock(night) {
+  const block = el("div", { class: "panel" });
+  block.append(el("div", { class: "k" }, "gantt — per command, bars to scale"));
+  const t0 = night.commands[0]?.started || night.now;
+  const span = Math.max(...night.commands.map((c) => (durationOf(c, night.now) + (c.started - t0) / 1000)), 0.001);
+  for (const c of night.commands) {
+    const off = ((c.started - t0) / 1000 / span) * 100;
+    const w = Math.max((durationOf(c, night.now) / span) * 100, 0.8);
+    const track = el("div", { class: `track${c.state === "running" ? " hatch" : c.state === "failed" ? " miss" : ""}`, style: "height:10px" },
+      el("i", { style: `left:${off.toFixed(2)}%;width:${w.toFixed(2)}%` }));
+    block.append(el("div", { class: "row" },
+      el("span", { class: "name" }, c.short),
+      track,
+      el("span", { class: "n" }, fmtSecs(durationOf(c, night.now)))));
+  }
+  if (!night.commands.length) block.append(el("div", { class: "empty" }, "no commands recorded"));
+  return block;
+}
+
+autoRefresh(async (night) => {
+  const live = night.state === "running" || night.state === "starting";
+  $("meta").textContent = "";
+  $("meta").append(`run ${night.date} · `, nightPicker(night.date, gotoNight));
+  const st = $("st");
+  st.textContent = "";
+  st.append(el("span", { class: `dot${live ? " blink on" : night.state === "failed" ? "" : " on"}` }), stateLabel(night.state));
+
+  // Banner = stop reason, dataroom-style.
+  const b = $("banner");
+  b.style.display = "none";
+  if (night.state === "failed") {
+    b.style.display = "block";
+    b.textContent = "";
+    b.append(el("b", {}, `FAILED — make exit ${night.status?.make_exit} · `), (night.failedTargets.map((t) => t.short).join(", ") || "unknown target") + ". First non-zero exit wins the night; retry at next cron.");
+  } else if (night.state === "success" || night.state === "finished") {
+    b.style.display = "block";
+    b.textContent = "";
+    b.append(el("b", {}, "DONE — "), `${night.targets.length} targets, exit 0, ${fmtSecs(night.elapsed)}`);
+  } else if (night.state === "no-data") {
+    b.style.display = "block";
+    b.append(el("b", {}, "NO DATA — "), `nothing recorded under logs/${night.date}/`);
+  }
+
+  // Hero: progress + NOW.
+  const done = night.targets.filter((t) => t.state !== "running").length;
+  const pct = night.targets.length ? Math.round((done / night.targets.length) * 100) : 0;
+  $("pct").textContent = `${pct}%`;
+  $("progcount").textContent = `${done}/${night.targets.length} targets`;
+  const pb = $("pbar");
+  pb.className = `pbar${live ? " hatch" : ""}`;
+  pb.firstElementChild.style.width = `${pct}%`;
+  $("proglabel").textContent = night.started ? `started ${fmtTime(night.started)} · elapsed ${fmtSecs(night.elapsed)}` : "no make activity";
+  const nowCmd = [...night.commands].reverse().find((c) => c.state === "running") || night.commands[night.commands.length - 1];
+  const nl = $("nowline");
+  nl.textContent = "";
+  nl.className = "nowline";
+  if (nowCmd) {
+    nl.append(el("span", { class: "t" }, fmtTime(nowCmd.started)), `${nowCmd.short}: ${nowCmd.command}`);
+    if (nowCmd.state === "running") nl.className = "nowline live";
+  } else nl.textContent = "no commands";
+  $("nowgen").textContent = live ? "streaming from logs/<date>/ — refreshes every 3s while the night runs" : `last command finished ${fmtTime(nowCmd?.finished)}`;
+
+  // Vitals.
+  const v = $("vitals");
+  v.textContent = "";
+  v.append(
+    cell("critical path", night.criticalPath ? fmtSecs(night.criticalPath.longest_downstream) : "–",
+      night.dag.length ? criticalChain(night.dag).map((d) => d.short).join(" → ") : "dag.json missing"),
+    cell("rows loaded", fmtInt(night.ledger?.records_loaded ?? null), `${(night.ledger?.runs || []).length} dlt-ops run(s) this night`),
+    cell("warehouse tables", String(Object.keys(night.ledger?.tables || {}).length), Object.entries(night.ledger?.tables || {}).slice(0, 3).map(([t, n]) => `${t} ${fmtInt(n)}`).join(" · ") || "no snapshot"),
+    cell("retries", `${night.status?.attempt ?? 0}/${night.status?.max_attempts ?? "–"}`, `make exit ${night.status?.make_exit ?? "?"}`),
+  );
+  // Target distribution: seconds per make-level target.
+  const dist = el("div", { class: "cell", style: "grid-column:1/-1" },
+    el("div", { class: "k" }, "target distribution — seconds per target"));
+  const maxDur = Math.max(...night.targets.filter((t) => !t.helper).map((t) => t.duration || 0), 0.001);
+  for (const t of night.targets) {
+    if (t.duration == null) continue;
+    dist.append(el("div", { class: "row" },
+      el("span", { class: "name" }, t.short),
+      el("div", { class: `track${t.state === "running" ? " hatch" : t.state === "failed" ? " miss" : ""}`, style: "height:10px" },
+        el("i", { style: `width:${((t.duration / maxDur) * 100).toFixed(1)}%` })),
+      el("span", { class: "n" }, fmtSecs(t.duration))));
+  }
+  v.append(dist, ganttBlock(night));
+
+  // Errors cell only when there is something to say.
+  const errs = (night.ledger?.runs || []).filter((r) => r.error_summary)
+    .concat(night.failedTargets.map((t) => ({ error_summary: `${t.short}: exit ${t.exit}` })));
+  const ec = el("div", { class: `cell errcell${errs.length ? " has" : ""}` },
+    el("div", { class: "k" }, "warnings / errors"),
+    el("ul", { class: "errs" }, errs.map((r) => el("li", {}, el("span", { class: "g" }, "!"), (r.error_summary || "").split("\n").filter(Boolean).pop() || ""))));
+  v.append(ec);
+
+  // Activity feed: every tracked command.
+  const feed = $("feed");
+  feed.textContent = "";
+  for (const c of night.commands) {
+    feed.append(el("li", { class: `${c.state === "running" ? "live" : ""} ${c.state === "failed" ? "bad" : ""}` },
+      el("span", { class: "t" }, fmtTime(c.started)),
+      el("span", { class: "v" }, `${c.short} · ${c.command}`),
+      el("span", { class: "n" }, c.state === "running" ? "…" : fmtSecs(durationOf(c, night.now)))));
+  }
+  if (!night.commands.length) feed.append(el("li", {}, el("span", { class: "v empty" }, "empty")));
+
+  // Log tree | preview.
+  $("treedir").textContent = `logs/${night.date}/`;
+  const tree = $("tree");
+  tree.textContent = "";
+  const files = [
+    ...night.targets.map((t) => ({ name: t.logFile, isTarget: true, t })),
+    { name: "attempt-" + String(night.status?.attempt ?? 0).padStart(2, "0") + ".log", isTarget: false },
+    { name: "timing_env.log", isTarget: false }, { name: "status.json", isTarget: false },
+    { name: "ledger.json", isTarget: false }, { name: "dag.json", isTarget: false },
+  ];
+  for (const f of files) {
+    const spanText = f.isTarget ? `${f.name} ` : `${f.name} `;
+    const link = el("span", { class: "f" }, spanText);
+    link.addEventListener("click", async () => {
+      document.querySelectorAll(".tree .f.sel").forEach((x) => x.classList.remove("sel"));
+      link.classList.add("sel");
+      $("prev").textContent = "loading…";
+      const body = f.isTarget ? await night.fetchTargetLog(f.t) : await (await fetch(night.base + f.name, { cache: "no-store" })).text();
+      $("prev").textContent = body || "(empty)";
+    });
+    tree.append(el("div", {}, link, el("span", { class: "s" }, "")));
+  }
+  $("foot-l").textContent = `attempt ${night.status?.attempt ?? "?"} of ${night.status?.max_attempts ?? "?"} · pid ${night.status?.pid ?? "–"}`;
+}, 3000);
+</script>
+</body>
+</html>

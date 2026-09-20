@@ -1,0 +1,59 @@
+# docker.yml — ensure the container image exists on merge to main.
+#
+# The Kubernetes CronJob (deploy/k8s/cronjob.yaml) pulls the image from GHCR,
+# but nothing else builds it.  This workflow runs on every push to main and
+# only builds + pushes when the tag is missing, so the registry stays in sync
+# with the repo without rebuilding on every merge.
+#
+# The image name is derived from the repository (ghcr.io/<owner>/<repo>,
+# lowercased — GHCR requires it); keep deploy/k8s/cronjob.yaml in agreement.
+# The initial push may take a few minutes to become pullable; the manifest
+# check below tolerates that (worst case it rebuilds once).
+
+name: docker
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve image name and check if it exists
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          if docker manifest inspect "$IMAGE:latest" >/dev/null 2>&1; then
+            echo "exists=1" >> "$GITHUB_OUTPUT"
+            echo "::notice::$IMAGE:latest already exists; skipping build"
+          else
+            echo "exists=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/login-action@v3
+        if: steps.check.outputs.exists != '1'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        if: steps.check.outputs.exists != '1'
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.check.outputs.image }}:latest
+            ${{ steps.check.outputs.image }}:${{ github.sha }}

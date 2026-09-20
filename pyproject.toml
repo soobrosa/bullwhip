@@ -1,0 +1,33 @@
+[project]
+name = "bullwhip"
+version = "0.1.0"
+description = "Nightly batch data-pipeline framework: cron + make + dlt-ops + SQLMesh"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "dlt[duckdb]>=1.30.0",
+    "dlt-ops>=0.1.0",
+    "sqlmesh[duckdb]>=0.140.0",
+    "duckdb>=1.2.0,<1.3.0",
+]
+
+[project.optional-dependencies]
+postgres = ["dlt[postgres]"]
+bigquery = ["dlt[bigquery]", "google-cloud-bigquery"]
+clickhouse = ["dlt[clickhouse]", "clickhouse-connect"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["lib"]
+omit = ["lib/dlt_ops_fallback.py"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 60

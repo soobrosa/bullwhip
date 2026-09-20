@@ -1,0 +1,7 @@
+# Source Postgres config — used by dlt for extraction.
+
+export PGHOST="localhost"
+export PGPORT=5432
+export PGDATABASE="source_db"
+export PGUSER=""
+export PGPASSWORD=""

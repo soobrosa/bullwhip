@@ -1,0 +1,6 @@
+# DuckDB connector config — sourced by both the dlt EL worker and SQLMesh.
+# dlt reads DUCKDB_PATH; SQLMesh reads the same via the gateway config.
+
+export DIALECT="duckdb"
+export DUCKDB_PATH="./warehouse.duckdb"
+export DATABASE="my_db"

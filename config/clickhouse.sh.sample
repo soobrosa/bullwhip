@@ -1,0 +1,8 @@
+# ClickHouse connector config.
+
+export DIALECT="clickhouse"
+export CLICKHOUSE_HOST="localhost"
+export CLICKHOUSE_PORT="8123"
+export CLICKHOUSE_USER="default"
+export CLICKHOUSE_PASSWORD=""
+export DATABASE="my_db"

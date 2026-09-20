@@ -1,0 +1,23 @@
+# SQLMesh configuration — adopted thin.
+#
+# One gateway per connector, reusing the config/*.sh credential files via env.
+# The nightly recipe runs `plan --no-prompts --auto-apply` (bootstraps prod on
+# an empty warehouse, no-op when nothing changed) and then `run` (evaluates
+# whichever models have a completed cron interval).
+#
+# The DuckDB file is the shared warehouse substrate: dlt lands tables here,
+# SQLMesh reads and transforms them, both tools' state tables sit side by side.
+# BULLWHIP_DUCKDB relocates it (a mounted volume in Docker/Kubernetes); it
+# must agree with dlt's DESTINATION__DUCKDB__CREDENTIALS.
+
+gateways:
+  prod:
+    connection:
+      type: duckdb
+      database: {{ env_var('BULLWHIP_DUCKDB', '../warehouse.duckdb') }}
+
+default_gateway: prod
+
+model_defaults:
+  dialect: duckdb
+  start: "2026-01-01"

@@ -1,0 +1,133 @@
+# Kubernetes version of the nightly: a CronJob that runs the same image and
+# the same lib/run_workflow.sh as cron / GitHub Actions.
+#
+# STATUS: written from the Docker image and the Action, validated as YAML,
+# NOT yet applied to a cluster.  Treat as a starting point.
+#
+# What Kubernetes takes over from run_workflow.sh / the Action:
+#   - schedule ........... spec.schedule (was crontab / on.schedule)
+#   - single-flight ...... concurrencyPolicy: Forbid (was the ps check + locked)
+#   - retries ............ backoffLimit: 2 -> three pods max; BULLWHIP_FAIL_FAST=1
+#                          makes a failed attempt exit 1 so the Job retries, and the
+#                          attempt-NN.log files on the volume make the third pod the
+#                          "final" one that dumps every log (was the 3x loop)
+#   - state .............. one PersistentVolumeClaim holds warehouse.duckdb, dlt state
+#                          and every night's logs (was actions/cache; here it is durable)
+#   - secrets ............ a Secret -> env var (was ${{ secrets.GITHUB_TOKEN }})
+#   - logs ............... kubectl logs job/<name>; the final attempt cats them
+#
+# Before applying:
+#   docker build -t ghcr.io/<you>/bullwhip:latest . && docker push ...
+#   kubectl create secret generic bullwhip --from-literal=github-token=ghp_...
+#   kubectl apply -f deploy/k8s/cronjob.yaml
+#   kubectl create job --from=cronjob/bullwhip bullwhip-now   # try one night
+#
+# Paths inside the image: the Dockerfile copies the repo to /app.  The warehouse
+# is relocated to the volume via BULLWHIP_DUCKDB (read by sqlmesh/config.yaml
+# and the ledger) and DESTINATION__DUCKDB__CREDENTIALS (read by dlt); the two
+# must agree.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bullwhip-data
+spec:
+  # ReadWriteOnce is enough for the CronJob alone.  The optional dashboard
+  # Deployment below mounts the same claim, which with RWO only works when both
+  # pods land on the same node; use a ReadWriteMany storage class for that.
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bullwhip
+spec:
+  schedule: "0 3 * * *"            # 03:00 UTC, same as the Action
+  timeZone: "Etc/UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600    # skip the night if it cannot start within an hour
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 7
+  jobTemplate:
+    spec:
+      backoffLimit: 2              # attempts 0, 1, 2
+      activeDeadlineSeconds: 1800
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: night
+              image: ghcr.io/<you>/bullwhip:latest
+              imagePullPolicy: Always
+              workingDir: /app
+              command: ["bash", "lib/run_workflow.sh"]
+              env:
+                - name: BULLWHIP_FAIL_FAST
+                  value: "1"
+                - name: BULLWHIP_MAX_ATTEMPTS
+                  value: "2"
+                - name: BULLWHIP_DUCKDB
+                  value: /data/warehouse.duckdb
+                - name: DESTINATION__DUCKDB__CREDENTIALS
+                  value: /data/warehouse.duckdb
+                - name: DLT_DATA_DIR
+                  value: /data/.dlt-data
+                - name: GITHUB_HEALTH_FIXTURE
+                  value: "0"       # "1" = inline fixture data, no API calls
+                - name: SOURCES__GITHUB_HEALTH__CREDENTIALS__TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: bullwhip
+                      key: github-token
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+                - name: data
+                  mountPath: /app/examples/github-health/logs
+                  subPath: logs
+              resources:
+                requests: { cpu: "500m", memory: "1Gi" }
+                limits: { memory: "2Gi" }
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: bullwhip-data
+---
+# Optional: the dashboards, reading the same volume.  Plain http.server from
+# /app, exactly like `python3 -m http.server 8765 -d .` locally.
+#   kubectl port-forward deploy/bullwhip-web 8765:8765
+#   open http://localhost:8765/web/f.html?project=examples/github-health
+# See the RWO note on the claim above.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bullwhip-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: bullwhip-web }
+  template:
+    metadata:
+      labels: { app: bullwhip-web }
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/<you>/bullwhip:latest
+          workingDir: /app
+          command: ["python3", "-m", "http.server", "8765", "-d", "/app"]
+          ports:
+            - containerPort: 8765
+          volumeMounts:
+            - name: data
+              mountPath: /app/examples/github-health/logs
+              subPath: logs
+              readOnly: true
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: bullwhip-data

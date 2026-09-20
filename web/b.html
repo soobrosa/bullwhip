@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>bullwhip · gantt + dag</title>
+<style>
+  /* Option B: the live-observability plan — Observable Plot Gantt, ELK DAG. */
+  * { box-sizing: border-box; padding: 0; margin: 0; }
+  body { font-family: -apple-system, "Helvetica Neue", sans-serif; font-size: 14px; color: #24292f; background: #fff; }
+  header { background: #1f2933; color: #fff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; }
+  header a { color: #fff; text-decoration: none; font-weight: 600; }
+  header .meta { font-size: 12px; color: #cbd2d9; }
+  select { font: inherit; }
+  section { padding: 16px 20px; }
+  h2 { font-size: 15px; font-weight: 600; margin: 8px 0 12px; color: #3e4c59; }
+  .state { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
+  .state.success { background: #d4f7e4; color: #0a6c3a; } .state.failed { background: #fde3e1; color: #a4271a; }
+  .state.running { background: #ffedbf; color: #8a4b00; } .state.other { background: #e4e7eb; color: #52606d; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: #52606d; margin-bottom: 8px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  #dag svg { max-width: 100%; height: auto; }
+  .node rect { fill: #fff; stroke: #9aa5b1; rx: 4; }
+  .node.crit rect { stroke: #d93a2b; stroke-width: 2; }
+  .node text { font-size: 11px; fill: #24292f; }
+  .node .dur { fill: #7b8794; font-size: 10px; }
+  .edge path { stroke: #cbd2d9; fill: none; }
+  .edge.crit path { stroke: #d93a2b; stroke-width: 1.6; }
+  .cdn { color: #a4271a; font-size: 13px; padding: 8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <a href="./">bullwhip</a>
+  <span class="meta" id="meta"></span>
+</header>
+<section>
+  <h2>Command gantt <span id="state" class="state other"></span></h2>
+  <div class="legend">
+    <span><i style="background:#2e7d32"></i>success</span>
+    <span><i style="background:#e74c3c"></i>failed</span>
+    <span><i style="background:#f39c12"></i>running</span>
+    <span><i style="background:#cbd2d9"></i>helper (touch/mkdir)</span>
+  </div>
+  <div id="gantt"></div>
+</section>
+<section>
+  <h2>DAG with critical path (ELK layered layout)</h2>
+  <div id="dag"></div>
+</section>
+
+<script type="module">
+import { loadNight, autoRefresh, nightPicker, gotoNight, stateLabel, durationOf, criticalChain, el } from "./shared.js";
+
+// Chart libs come from the CDN — this option bundles nothing.
+let Plot, ELK;
+try {
+  // Plot has no `Plot` export (its ESM build is named exports only, hence
+  // `import * as Plot` in the docs) and no version 5 — the library is 0.x.
+  // Namespace-import it and use Plot.plot / Plot.barY / … directly.
+  Plot = await import("https://cdn.jsdelivr.net/npm/@observablehq/plot@0.4/+esm");
+  const elkMod = await import("https://cdn.jsdelivr.net/npm/elkjs@0.8.2/lib/elk.bundled.js/+esm");
+  ELK = elkMod.default || elkMod.ELK;
+} catch (e) {
+  document.getElementById("gantt").append(el("div", { class: "cdn" }, `chart libraries unavailable: ${e.message}`));
+}
+
+const color = (c) => (c.state === "failed" ? "#e74c3c" : c.state === "running" ? "#f39c12" : c.helper ? "#cbd2d9" : "#2e7d32");
+
+function renderGantt(night) {
+  const box = document.getElementById("gantt");
+  box.textContent = "";
+  if (!Plot) return;
+  if (!night.commands.length) { box.append(el("div", { class: "cdn" }, "no timing_env.log for this night")); return; }
+  const marks = [
+    Plot.barY(night.commands, {
+      x1: (d) => d.started, x2: (d) => d.finished || night.now,
+      y: (d) => d.short || d.target, fill: color,
+      sort: { y: "-x1" }, insetLeft: 1,
+    }),
+    Plot.ruleX(night.commands.filter((c) => !c.helper), {
+      x: (d) => d.started, y: (d) => d.short, stroke: "#9aa5b1", strokeWidth: 0.5,
+    }),
+  ];
+  box.append(Plot.plot({
+    marks,
+    x: { label: null, grid: true, nice: true },
+    y: { label: null, padding: 0.25 },
+    height: Math.max(140, night.commands.length * 26),
+    marginBottom: 34,
+    style: { font: "inherit", overflow: "visible" },
+  }));
+}
+
+async function renderDag(night) {
+  const box = document.getElementById("dag");
+  box.textContent = "";
+  if (!ELK || !night.dag.length) return;
+  const chain = new Set(criticalChain(night.dag).map((t) => t.id));
+  const graph = {
+    id: "root",
+    layoutOptions: { "elk.algorithm": "layered", "elk.direction": "DOWN", "elk.layered.spacing.nodeNodeBetweenLayers": 46, "elk.spacing.nodeNode": 22 },
+    children: night.dag.map((t) => ({
+      id: t.id, width: 168, height: 44,
+      labels: [{ text: t.short, x: 8, y: 10 }, { text: `${t.avg_duration ? t.avg_duration.toFixed(2) + "s" : "–"} · path ${t.longest_downstream.toFixed(1)}s`, x: 8, y: 26, class: "dur" }],
+    })),
+    edges: night.dag.flatMap((t) => t.deps.map((d) => ({ id: `${d}->${t.id}`, sources: [d], targets: [t.id] }))),
+  };
+  const layout = await new ELK().layout(graph);
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  const w = Math.max(...layout.children.map((n) => n.x + n.width)) + 20;
+  const h = Math.max(...layout.children.map((n) => n.y + n.height)) + 20;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.setAttribute("width", Math.min(w, 1100));
+  const pos = new Map(layout.children.map((n) => [n.id, n]));
+  for (const e of layout.edges || []) {
+    const crit = chain.has(e.sources[0]) && chain.has(e.targets[0]);
+    const g = document.createElementNS(NS, "g");
+    g.setAttribute("class", `edge${crit ? " crit" : ""}`);
+    for (const s of e.sections || []) {
+      const p = document.createElementNS(NS, "path");
+      const bends = (s.bendPoints || []).map((b) => `L ${b.x} ${b.y}`).join(" ");
+      p.setAttribute("d", `M ${s.startPoint.x} ${s.startPoint.y} ${bends} L ${s.endPoint.x} ${s.endPoint.y}`);
+      g.append(p);
+    }
+    svg.append(g);
+  }
+  for (const n of layout.children) {
+    const g = document.createElementNS(NS, "g");
+    g.setAttribute("class", `node${chain.has(n.id) ? " crit" : ""}`);
+    g.setAttribute("transform", `translate(${n.x},${n.y})`);
+    const r = document.createElementNS(NS, "rect");
+    r.setAttribute("width", n.width); r.setAttribute("height", n.height); r.setAttribute("rx", 4);
+    const t = document.createElementNS(NS, "text"); t.setAttribute("x", 8); t.setAttribute("y", 22); t.textContent = night.dag.find((d) => d.id === n.id)?.short || n.id;
+    const d2 = document.createElementNS(NS, "text"); d2.setAttribute("x", 8); d2.setAttribute("y", 36); d2.setAttribute("class", "dur");
+    d2.textContent = n.labels[1].text;
+    g.append(r, t, d2);
+    svg.append(g);
+  }
+  box.append(svg);
+}
+
+autoRefresh(async (night) => {
+  const s = document.getElementById("state");
+  s.className = `state ${["success", "failed"].includes(night.state) ? night.state : "other"}`;
+  s.textContent = stateLabel(night.state);
+  const meta = document.getElementById("meta");
+  meta.textContent = "";
+  meta.append(`night ${night.date} · `, nightPicker(night.date, gotoNight));
+  renderGantt(night);
+  await renderDag(night);
+});
+</script>
+</body>
+</html>

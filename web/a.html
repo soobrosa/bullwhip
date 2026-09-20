@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>bullwhip · command gantt</title>
+<style>
+  /* Faithful port of night-shift/web/static/style.css (Flask era). */
+  * { padding: 0px; margin: 0px; }
+  body { font-family: Helvetica Neue, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 21px; }
+  header { background: #34495e; padding: 5px 10px; height: 31px; }
+  header a { font-size: 15px; text-transform: uppercase; padding: 5px 10px; color: #fff; text-decoration: none; display: inline-block; }
+  header a.active { font-weight: bold; color: #2ecc71; }
+  header a:hover { text-decoration: underline; }
+  header nav { float: right; }
+  header .meta { color: #ecf0f1; font-size: 12px; line-height: 41px; }
+  section { margin: 25px; }
+  h1 { font-size: 30px; line-height: 36px; font-weight: 300; margin-bottom: 12px; }
+  h2 { font-weight: 300; margin: 25px 0 6px 0; }
+  small { font-weight: 300; }
+  .state { display: inline-block; padding: 0 8px; border-radius: 2px; color: #fff; font-size: 12px; }
+  .state.success { background: #2ecc71; } .state.failed { background: #e74c3c; }
+  .state.running { background: #f39c12; } .state.other { background: #95a5a6; }
+
+  /* --- gantt view --- */
+  body.gantt > section.main button {
+    position: absolute; top: 80px; right: 25px; font-size: 15px; color: #2ecc71;
+    border: 0px; background: none; cursor: pointer; font-family: inherit;
+  }
+  body.gantt ul { list-style-type: none; clear: both; margin: 25px 0; }
+  body.gantt ul > li { position: relative; padding: 0 25px; }
+  body.gantt ul > li:hover { background: #f5f5f5; }
+  body.gantt ul > li.detailed { display: none; }
+  body.gantt ul > li > div {
+    font-size: 12px; font-weight: 200; position: relative; line-height: 18px; display: flex;
+  }
+  body.gantt ul > li > div > p { padding-left: 20px; white-space: nowrap; }
+  body.gantt ul > li > div > p > span { font-weight: normal; }
+  body.gantt ul > li > div.running { background-color: #f39c12; }
+  body.gantt ul > li > div.success { background-color: #2ecc71; }
+  body.gantt ul > li > div.failure { background-color: #e74c3c; }
+  body.gantt ul > li > a.time {
+    color: #34495e; font-size: 12px; line-height: 18px; text-decoration: none;
+    float: left; width: 55px;
+  }
+  body.gantt ul > li > a.time:hover { text-decoration: underline; }
+  body.gantt ul > li > a.time.failure { color: #e74c3c; font-weight: bold; }
+  body.gantt div.vl {
+    width: 1px; background-color: black; opacity: 0.05; line-height: 18px;
+    position: absolute; top: 0px; display: flex;
+  }
+
+  /* --- flow (log debugging) view --- */
+  body.flow > section.main label { cursor: pointer; display: block; }
+  body.flow > section.main label.failure { color: #e74c3c; }
+  body.flow > section.main label.success { color: #2ecc71; }
+  body.flow > section.main label.running { color: #f39c12; }
+  body.flow > section.main pre {
+    white-space: pre-wrap; word-wrap: break-word; background-color: #eee; border-radius: 2px;
+    font-size: 12px; font-weight: normal; font-family: Courier; display: none;
+    margin: 10px 0; padding: 10px; line-height: 15px;
+  }
+  body.flow > section.main input[type=checkbox] { display: none; }
+  body.flow > section.main input[type=checkbox]:checked ~ pre { display: block; }
+  body.flow > section.main input[type=checkbox]:checked ~ label { font-weight: bold; }
+  body.flow > section.main label.success ~ pre { border-left: 4px solid #89c402; }
+  body.flow > section.main label.failure ~ pre { border-left: 4px solid #e74c3c; }
+  body.flow > section.main label.running ~ pre { border-left: 4px solid #f39c12; }
+</style>
+</head>
+<body class="gantt">
+<header>
+  <a href="#" class="brand">bullwhip</a>
+  <nav>
+    <a href="#" id="nav-gantt" class="active">command gantt</a>
+    <a href="#" id="nav-flow">log debugging</a>
+  </nav>
+  <span class="meta" id="meta"></span>
+</header>
+
+<section class="main" id="gantt-view">
+  <h1>Command Gantt <span id="state" class="state other"></span></h1>
+  <button id="showlog" data-default-text="show every command" data-alternate-text="hide not make level commands">show every command</button>
+  <ul id="gantt"></ul>
+</section>
+
+<section class="main" id="flow-view" style="display:none">
+  <h1>Log Debugging</h1>
+  <div id="flow"></div>
+</section>
+
+<script type="module">
+import { loadNight, autoRefresh, nightPicker, gotoNight, fmtTime, fmtSecs, durationOf, nightState, stateLabel, el } from "./shared.js";
+
+const $ = (id) => document.getElementById(id);
+$("nav-gantt").addEventListener("click", (e) => { e.preventDefault(); setView("gantt"); });
+$("nav-flow").addEventListener("click", (e) => { e.preventDefault(); setView("flow"); });
+function setView(v) {
+  document.body.className = v;
+  $("gantt-view").style.display = v === "gantt" ? "" : "none";
+  $("flow-view").style.display = v === "flow" ? "" : "none";
+  $("nav-gantt").classList.toggle("active", v === "gantt");
+  $("nav-flow").classList.toggle("active", v === "flow");
+}
+$("showlog").addEventListener("click", () => {
+  const btn = $("showlog");
+  document.querySelectorAll("ul > li.detailed").forEach((li) => (li.style.display = li.style.display === "list-item" ? "none" : "list-item"));
+  btn.textContent = btn.textContent === btn.dataset.defaultText ? btn.dataset.alternateText : btn.dataset.defaultText;
+});
+
+// The original used 1px == 1 minute (60px hour grid).  A healthy night here
+// finishes in seconds, so the scale adapts: never zoom in past 1px/s, and
+// always keep grid lines at a round interval.
+function pickScale(commands, nightStart) {
+  const span = Math.max(...commands.map((c) => (durationOf(c, new Date()) + (c.started - nightStart) / 1000)), 1);
+  for (const [step, label] of [[1, "1s"], [5, "5s"], [15, "15s"], [60, "1m"], [300, "5m"], [900, "15m"], [3600, "1h"]]) {
+    if (span / step <= 90) return { pxPerSec: Math.max(1, 90 / span), step, label };
+  }
+  return { pxPerSec: 1 / 3600, step: 3600, label: "1h" };
+}
+
+function renderGantt(night) {
+  const ul = $("gantt");
+  ul.textContent = "";
+  if (!night.commands.length) {
+    ul.append(el("li", {}, el("small", {}, "no timing_env.log for this night")));
+    return;
+  }
+  const nightStart = night.commands[0].started;
+  const { pxPerSec, step, label } = pickScale(night.commands, nightStart);
+  $("meta").textContent = "";
+  $("meta").append(`night ${night.date} · ${night.commands.length} commands · grid ${label} · `, nightPicker(night.date, gotoNight));
+
+  for (const c of night.commands) {
+    const waited = (c.started - nightStart) / 1000;
+    const len = durationOf(c, new Date());
+    const li = el("li", { class: c.helper ? "detailed" : "" });
+    if (c.helper) li.style.display = "none";
+    li.append(el("a", { class: `time ${c.state === "failed" ? "failure" : ""}`, href: "#", onclick: (e) => { e.preventDefault(); setView("flow"); } },
+      fmtTime(c.started).slice(0, 5)));
+    const bar = el("div", { class: c.state, style: `left:${(waited * pxPerSec).toFixed(2)}px;width:${(Math.max(len * pxPerSec, 2)).toFixed(2)}px;` },
+      el("p", {}, el("span", {}, `${len < 10 ? len.toFixed(2) : len.toFixed(0)}s`), `: ${c.command}`));
+    li.append(bar);
+    for (let i = 0; i * step * pxPerSec < 1200; i++) {
+      li.append(el("div", { class: "vl", style: `left:${25 + 55 + 60 * i}px;` }, "\u00a0"));
+    }
+    ul.append(li);
+  }
+}
+
+async function renderFlow(night) {
+  const flow = $("flow");
+  flow.textContent = "";
+  for (const t of night.targets) {
+    const h = el("h2", {}, `${t.short} `, el("small", {}, `${fmtSecs(t.duration)} · exit ${t.exit ?? "?"}`));
+    const label = el("label", { class: t.state }, `${t.commands.length} command${t.commands.length > 1 ? "s" : ""} — click for log`);
+    const box = el("input", { type: "checkbox" });
+    const pre = el("pre", {}, "loading…");
+    night.fetchTargetLog(t).then((log) => { pre.textContent = log || "(no log)"; });
+    const wrap = el("div", {}, h, box, label, pre);
+    flow.append(wrap);
+  }
+}
+
+function autoCheck(night) {
+  const s = $("state");
+  s.className = `state ${["success", "failed"].includes(night.state) ? night.state : "other"}`;
+  s.textContent = stateLabel(night.state);
+}
+
+autoRefresh(async (night) => {
+  autoCheck(night);
+  renderGantt(night);
+  await renderFlow(night);
+});
+</script>
+</body>
+</html>

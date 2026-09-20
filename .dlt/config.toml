@@ -1,0 +1,28 @@
+# dlt-ops project config — the project marker and destination config.
+#
+# dlt-ops reads this file for the [dlt_ops] table (project-level settings)
+# and the [sources.*] tables (per-source config).  Credentials come from
+# .dlt/secrets.toml or the environment, same as dlt itself.
+
+[dlt_ops]
+# Project-wide destination + dataset (shared DuckDB warehouse with SQLMesh).
+default_destination = "duckdb"
+default_dataset = "my_db"
+
+# Rule framework: missing = on, false = off.  See `dlt-ops pipeline validate
+# --show-resolved-rules` for the full list.
+# import_safety = false  # opt out of the import sandbox
+
+# Source: github_health — the health of github.com/trending's daily repos.
+# The repo list is discovered from the trending page each night, not
+# configured here.
+[sources.github_health.dlt_ops]
+schedule = "@manual"
+destination = "duckdb"
+dataset = "my_db"
+
+# Source: people_ingest — minimal example for examples/incremental_load.
+[sources.people_ingest.dlt_ops]
+schedule = "@manual"
+destination = "duckdb"
+dataset = "my_db"

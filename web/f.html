@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>bullwhip · command gantt</title>
+<style>
+  /* Option F: e.html with the redundant and non-informative parts removed.
+     Solid = success, hatched = running, outlined = failed.  Exit codes, time
+     columns, counts and glyphs appear only when they carry information. */
+  :root { --bg:#ffffff; --fg:#000000; --mut:#666; --line:#000; --soft:#e5e5e5; --fill:#000; }
+  @media (prefers-color-scheme: dark){ :root{ --bg:#000; --fg:#fff; --mut:#999; --line:#fff; --soft:#222; --fill:#fff; } }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.45;overflow-x:hidden}
+  a{color:inherit}
+  .wrap{width:100%;max-width:none;margin:0;padding:20px 28px;min-width:0}
+  header{display:flex;justify-content:space-between;align-items:baseline;
+    border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:0}
+  h1{font-size:14px;font-weight:600;letter-spacing:.04em;margin:0;text-transform:uppercase}
+  .meta{color:var(--mut);font-size:11px}
+  .dot{display:inline-block;width:7px;height:7px;border:1px solid var(--line);margin-right:6px;vertical-align:middle}
+  .dot.on{background:var(--fill)}
+  .blink{animation:b 1s steps(2) infinite}
+  @keyframes b{50%{opacity:.2}}
+  select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line)}
+  .k{color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+  .sub{color:var(--mut);font-size:11px}
+  .empty{color:var(--mut);font-size:11px}
+
+  .actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
+  .actions > div{display:flex;gap:6px}
+  .btn{border:1px solid var(--line);background:var(--bg);color:var(--fg);
+    padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none}
+  .btn:hover{background:var(--soft)}
+  .btn.on{background:var(--fill);color:var(--bg)}
+
+  .banner{border:1px solid var(--line);border-left-width:4px;border-top:none;padding:8px 12px;font-size:12px;display:none;overflow-wrap:anywhere}
+  .banner b{letter-spacing:.04em}
+
+  /* --- gantt view --- */
+  .panel{padding:14px 16px;border-bottom:1px solid var(--line)}
+  .axis{display:flex;margin:0 0 4px 0;font-size:10px;color:var(--mut)}
+  .axis .t{width:0;flex:none}
+  .axis .ticks{flex:1;position:relative;height:14px}
+  .axis .ticks span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+  .axis .ticks span:first-child{transform:none}
+  .rows{border-top:1px solid var(--soft)}
+  .row{display:flex;align-items:center;gap:0;height:22px;border-bottom:1px solid var(--soft);min-width:0}
+  .row:hover{background:var(--soft)}
+  .detailed{display:none}
+  body.all .row.detailed{display:flex}
+  body.all .target.detailed{display:block}
+  .row .t{width:0;flex:none;font-size:11px;color:var(--mut);overflow:hidden;white-space:nowrap}
+  body.long .row .t,body.long .axis .t{width:80px}
+  .row.bad .t{color:var(--fg);font-weight:700}
+  .row .track{flex:1;position:relative;height:100%;min-width:0;overflow:hidden}
+  .row .grid{position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:.08}
+  .row .bar{position:absolute;top:5px;bottom:5px;border:1px solid var(--line);background:var(--fill);min-width:2px}
+  .row .bar.hatch{background:repeating-linear-gradient(45deg,var(--fill) 0 3px,transparent 3px 6px)}
+  .row .bar.miss{background:transparent;border-width:2px}
+  .row .lbl{position:absolute;top:0;line-height:22px;font-size:11px;white-space:nowrap;padding-left:8px;cursor:pointer}
+  .row .lbl:hover{text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+  .row .lbl .n{color:var(--mut);margin-right:6px}
+  .row.bad .lbl{font-weight:700}
+  .row.live .lbl{font-weight:600}
+  .legend{display:flex;gap:16px;font-size:11px;color:var(--mut);margin-top:10px}
+  .legend i{display:inline-block;width:14px;height:8px;border:1px solid var(--line);background:var(--fill);vertical-align:-1px;margin-right:5px}
+  .legend i.hatch{background:repeating-linear-gradient(45deg,var(--fill) 0 3px,transparent 3px 6px)}
+  .legend i.miss{background:transparent;border-width:2px}
+
+  /* --- log debugging view --- */
+  .target{padding:14px 16px;border-bottom:1px solid var(--line)}
+  .target .head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .target .name{font-weight:600}
+  .target .name .g{font-weight:700;margin-right:6px}
+  .target input[type=checkbox]{display:none}
+  .target label{display:inline-block;margin-top:6px;cursor:pointer;font-size:11px;color:var(--mut);
+    text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+  .target label:hover{color:var(--fg)}
+  .target input:checked ~ label{color:var(--fg);font-weight:600}
+  .target pre{display:none;margin:10px 0 0 0;padding:8px 12px;border-left:3px solid var(--line);
+    white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5;max-height:min(50vh,600px);overflow:auto}
+  .target.bad pre{border-left-width:4px}
+  .target input:checked ~ pre{display:block}
+  .target .cmds{margin:6px 0 0 0;padding:0;list-style:none;font-size:11px;color:var(--mut)}
+  .target .cmds li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .target .cmds li .s{display:inline-block;width:1.2em}
+  .target .cmds li.bad{color:var(--fg);font-weight:600}
+  @media(max-width:560px){ .wrap{padding:16px 14px} body.long .row .t,body.long .axis .t{width:60px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><a href="./">bullwhip</a></h1>
+    <div class="meta"><span id="meta"></span> · <span id="st"><span class="dot blink"></span>connecting</span></div>
+  </header>
+
+  <div class="actions">
+    <div>
+      <button class="btn on" id="nav-gantt">command gantt</button>
+      <button class="btn" id="nav-flow">log debugging</button>
+    </div>
+    <div>
+      <button class="btn" id="showlog" data-default-text="show every command" data-alternate-text="hide helper commands">show every command</button>
+    </div>
+  </div>
+
+  <div class="banner" id="banner"></div>
+
+  <div id="gantt-view">
+    <div class="panel">
+      <div class="k" id="scale"></div>
+      <div class="axis"><span class="t"></span><div class="ticks" id="ticks"></div></div>
+      <div class="rows" id="gantt"></div>
+      <div class="legend">
+        <span><i></i>success</span>
+        <span><i class="hatch"></i>running</span>
+        <span><i class="miss"></i>failed</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="flow-view" style="display:none">
+    <div id="flow"></div>
+  </div>
+</div>
+
+<script type="module">
+import { autoRefresh, nightPicker, gotoNight, stateLabel, fmtTime, fmtSecs, durationOf, el } from "./shared.js";
+
+const $ = (id) => document.getElementById(id);
+const openTargets = new Set();       // survives re-renders while the night runs
+const logCache = new Map();
+const query = new URLSearchParams(location.search);
+const openByName = new Set((query.get("open") || "").split(",").filter(Boolean));
+let autoOpened = false;
+
+// "cd ../.. &&" is makefile plumbing, identical on every recipe line.
+const showCmd = (cmd) => cmd.replace(/^\s*cd\s+\S+\s*&&\s*/, "");
+// A target made only of touch/mkdir/echo is scaffolding, not work.
+const isHelperTarget = (t) => t.commands.every((c) => c.helper);
+
+$("nav-gantt").addEventListener("click", () => setView("gantt"));
+$("nav-flow").addEventListener("click", () => setView("flow"));
+function setView(v) {
+  $("gantt-view").style.display = v === "gantt" ? "" : "none";
+  $("flow-view").style.display = v === "flow" ? "" : "none";
+  $("nav-gantt").classList.toggle("on", v === "gantt");
+  $("nav-flow").classList.toggle("on", v === "flow");
+}
+$("showlog").addEventListener("click", () => {
+  const btn = $("showlog");
+  const all = document.body.classList.toggle("all");
+  btn.textContent = all ? btn.dataset.alternateText : btn.dataset.defaultText;
+  btn.classList.toggle("on", all);
+});
+
+function pickStep(spanSecs) {
+  for (const s of [1, 2, 5, 10, 15, 30, 60, 300, 900, 1800, 3600]) if (spanSecs / s <= 12) return s;
+  return 3600;
+}
+const stepLabel = (s) => (s < 60 ? `${s}s` : s < 3600 ? `${s / 60}m` : `${s / 3600}h`);
+
+function renderGantt(night) {
+  const rows = $("gantt");
+  rows.textContent = "";
+  $("ticks").textContent = "";
+  if (!night.commands.length) {
+    rows.append(el("div", { class: "empty" }, "no timing_env.log for this night"));
+    $("scale").textContent = "";
+    return;
+  }
+  const t0 = night.commands[0].started;
+  const span = Math.max(...night.commands.map((c) => (c.started - t0) / 1000 + durationOf(c, night.now)), 0.001);
+  const step = pickStep(span);
+  const axisEnd = Math.ceil(span / step) * step || step;
+  // A per-row clock only distinguishes rows once the night spans hours.
+  document.body.classList.toggle("long", span >= 3600);
+  $("scale").textContent = `command gantt — grid ${stepLabel(step)}`;
+  const pct = (secs) => (secs / axisEnd) * 100;
+
+  for (let s = 0; s <= axisEnd; s += step) {
+    $("ticks").append(el("span", { style: `left:${pct(s).toFixed(2)}%` }, s === 0 ? fmtTime(t0) : `+${stepLabel(s)}`));
+  }
+
+  for (const c of night.commands) {
+    const off = (c.started - t0) / 1000;
+    const len = durationOf(c, night.now);
+    const row = el("div", { class: `row${c.helper ? " detailed" : ""}${c.state === "failed" ? " bad" : ""}${c.state === "running" ? " live" : ""}` });
+    row.append(el("span", { class: "t" }, fmtTime(c.started)));
+    const track = el("div", { class: "track" });
+    for (let s = 0; s <= axisEnd; s += step) track.append(el("i", { class: "grid", style: `left:${pct(s).toFixed(2)}%` }));
+    const left = pct(off), width = Math.max(pct(len), 0.3);
+    track.append(el("i", { class: `bar${c.state === "running" ? " hatch" : c.state === "failed" ? " miss" : ""}`,
+      style: `left:${left.toFixed(2)}%;width:${width.toFixed(2)}%` }));
+    const n = c.state === "running" ? "…" : c.state === "failed" ? `${fmtSecs(len)} exit ${c.exit}` : fmtSecs(len);
+    track.append(el("span", { class: "lbl", style: `left:${Math.min(left + width, 100).toFixed(2)}%`, title: showCmd(c.command),
+      onclick: () => { openTargets.add(c.target); setView("flow"); renderFlow(lastNight); } },
+      el("span", { class: "n" }, n), c.short));
+    row.append(track);
+    rows.append(row);
+  }
+}
+
+function renderFlow(night) {
+  const flow = $("flow");
+  flow.textContent = "";
+  if (!night.targets.length) { flow.append(el("div", { class: "panel empty" }, "no targets recorded")); return; }
+  if (!autoOpened) {
+    for (const t of night.targets) if (t.state === "failed" || openByName.has(t.short)) openTargets.add(t.id);
+    autoOpened = true;
+  }
+  for (const t of night.targets) {
+    const id = `t-${t.id.replace(/[^a-z0-9]/gi, "_")}`;
+    const real = t.commands.filter((c) => !c.helper);
+    const glyph = t.state === "failed" ? "!" : t.state === "running" ? "□" : "■";
+    const head = el("div", { class: "head" },
+      el("span", { class: "name" }, el("span", { class: "g" }, glyph), t.short),
+      el("span", { class: "sub" }, `${fmtTime(t.started)} · ${fmtSecs(t.duration)}${t.state === "failed" ? ` · exit ${t.exit}` : ""}`));
+    // The command list earns its place only when there is more than one real
+    // command to tell apart; per-command glyphs only when they disagree.
+    const cmds = real.length > 1
+      ? el("ul", { class: "cmds" }, real.map((c) =>
+          el("li", { class: c.state === "failed" ? "bad" : null },
+            t.state === "failed" ? el("span", { class: "s" }, c.state === "failed" ? "!" : "■") : null,
+            `${fmtSecs(durationOf(c, night.now))} ${showCmd(c.command)}`)))
+      : el("div", { class: "sub" }, showCmd((real[0] || t.commands[0]).command));
+    const box = el("input", { type: "checkbox", id });
+    if (openTargets.has(t.id)) box.checked = true;
+    const label = el("label", { for: id }, "show log");
+    const pre = el("pre", {}, logCache.get(t.id) ?? "loading…");
+    const load = async () => {
+      const body = await night.fetchTargetLog(t);
+      logCache.set(t.id, body || "(no log)");
+      pre.textContent = logCache.get(t.id);
+    };
+    box.addEventListener("change", () => {
+      if (box.checked) { openTargets.add(t.id); load(); } else openTargets.delete(t.id);
+    });
+    if (box.checked) load();
+    flow.append(el("div", { class: `target${t.state === "failed" ? " bad" : ""}${isHelperTarget(t) ? " detailed" : ""}` }, head, cmds, box, label, pre));
+  }
+}
+
+let lastNight = null;
+autoRefresh(async (night) => {
+  lastNight = night;
+  const live = night.state === "running" || night.state === "starting";
+  const meta = $("meta");
+  meta.textContent = "";
+  meta.append(nightPicker(night.date, gotoNight));
+  if (night.status?.attempt > 0) meta.append(` · retry ${night.status.attempt}/${night.status.max_attempts}`);
+  const st = $("st");
+  st.textContent = "";
+  st.append(el("span", { class: `dot${live ? " blink on" : night.state === "failed" ? "" : " on"}` }), stateLabel(night.state));
+
+  const b = $("banner");
+  b.style.display = "none";
+  b.textContent = "";
+  const workTargets = night.targets.filter((t) => !isHelperTarget(t)).length;
+  if (night.state === "failed") {
+    b.style.display = "block";
+    b.append(el("b", {}, `FAILED — make exit ${night.status?.make_exit} · `), night.failedTargets.map((t) => t.short).join(", ") || "unknown target");
+  } else if (night.state === "success" || night.state === "finished") {
+    b.style.display = "block";
+    b.append(el("b", {}, "DONE — "), `${workTargets} targets, ${fmtSecs(night.elapsed)}`);
+  } else if (night.state === "no-data") {
+    b.style.display = "block";
+    b.append(el("b", {}, "NO DATA — "), `nothing recorded under logs/${night.date}/`);
+  }
+
+  renderGantt(night);
+  renderFlow(night);
+  if (query.get("view") === "flow" && !document.body.dataset.viewSet) {
+    document.body.dataset.viewSet = "1";
+    setView("flow");
+  }
+});
+</script>
+</body>
+</html>

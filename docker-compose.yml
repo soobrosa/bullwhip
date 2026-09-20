@@ -1,0 +1,38 @@
+# docker-compose.yml — run bullwhip in a container with gmake 4.4.
+#
+# The Dockerfile builds GNU Make 4.4.1 from source (for .WAIT wave support)
+# and installs dlt + SQLMesh + DuckDB.
+#
+# The container is one-shot: `up` runs a single attempt of run_workflow.sh and
+# exits.  Cron does not run inside it; schedule from outside, e.g. a host
+# crontab line `*/30 0-5 * * * docker compose -f /path/docker-compose.yml run
+# --rm bullwhip`, or use the GitHub Action / Kubernetes CronJob
+# (deploy/k8s/cronjob.yaml) instead.
+#
+# Usage:
+#   docker compose build
+#   docker compose run --rm bullwhip bash    # interactive
+#   docker compose run --rm bullwhip         # one attempt of tonight
+#
+# Warehouse, dlt state and logs live in the `data` volume (a volume is a
+# directory, so it cannot be mounted onto the warehouse.duckdb file itself);
+# BULLWHIP_DUCKDB and DESTINATION__DUCKDB__CREDENTIALS relocate the file
+# there and must agree.  Not exercised yet: Docker is not installed on the
+# machine this was written on.
+
+services:
+  bullwhip:
+    build: .
+    volumes:
+      - .:/app
+      - data:/data
+    environment:
+      - BULLWHIP_DUCKDB=/data/warehouse.duckdb
+      - DESTINATION__DUCKDB__CREDENTIALS=/data/warehouse.duckdb
+      - DLT_DATA_DIR=/data/.dlt-data
+      - GITHUB_HEALTH_FIXTURE=${GITHUB_HEALTH_FIXTURE:-1}
+      - SOURCES__GITHUB_HEALTH__CREDENTIALS__TOKEN=${GITHUB_TOKEN:-}
+    working_dir: /app
+
+volumes:
+  data:

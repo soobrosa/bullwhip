@@ -1,0 +1,177 @@
+# nightly.yml — run the night on GitHub Actions instead of cron.
+#
+# Same entry point as cron (lib/run_workflow.sh), same config
+# (config/bullwhip.sh), but:
+#   - retries happen in-process (BULLWHIP_FAIL_FAST=1, three tries a minute
+#     apart) instead of across half-hourly cron ticks;
+#   - the warehouse, dlt state and past nights' logs live in the Actions cache
+#     between runs (best effort: an evicted cache means a cold warehouse);
+#   - secrets come from the environment, never from .dlt/secrets.toml;
+#   - the dashboards plus every night's artifacts are published to GitHub
+#     Pages when Pages is enabled for the repository (Settings → Pages →
+#     Source: GitHub Actions).
+#
+# Manual runs can switch to fixture data (no API calls) or target a past date.
+
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"          # 03:00 UTC every day
+  workflow_dispatch:
+    inputs:
+      fixture:
+        description: "Use inline fixture data instead of the GitHub API"
+        type: boolean
+        default: false
+      date:
+        description: "Night to run as (YYYY-MM-DD); empty = today"
+        type: string
+        default: ""
+
+# One night at a time; a late cron tick queues behind a manual run.
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_DIR: examples/github-health
+
+jobs:
+  night:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # dlt pipeline state under the workspace so the cache can hold it.
+      DLT_DATA_DIR: ${{ github.workspace }}/.dlt-data
+      # What .dlt/secrets.toml would carry, as dlt's env-var equivalents.
+      DESTINATION__DUCKDB__CREDENTIALS: warehouse.duckdb
+      SOURCES__GITHUB_HEALTH__CREDENTIALS__TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_HEALTH_FIXTURE: ${{ inputs.fixture && '1' || '0' }}
+      BULLWHIP_DATE: ${{ inputs.date }}
+      # Three tries: attempts 0 and 1 exit 1 on failure (fail-fast), attempt 2
+      # is the final one and dumps every log.
+      BULLWHIP_MAX_ATTEMPTS: "2"
+      BULLWHIP_FAIL_FAST: "1"
+      # Slack failure ping on the final failed attempt + morning digest on
+      # success.  No-op unless the SLACK_WEBHOOK_URL secret is set
+      # (Settings → Secrets and variables → Actions).
+      BULLWHIP_NOTIFY: "slack"
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        # The repo is not a package (flat layout); install its dependency list.
+        run: uv pip install --system -r pyproject.toml
+
+      - name: Restore warehouse, dlt state and past nights
+        id: restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            warehouse.duckdb
+            .dlt-data
+            ${{ env.PROJECT_DIR }}/logs
+          key: bullwhip-state-${{ github.run_id }}
+          restore-keys: |
+            bullwhip-state-
+
+      - name: Run the night
+        id: run
+        run: |
+          set +e
+          for i in 0 1 2; do
+            bash lib/run_workflow.sh && exit 0
+            echo "::warning::attempt $i failed (make exit != 0)"
+            [ "$i" -lt 2 ] && sleep 60
+          done
+          exit 1
+
+      - name: Summary
+        if: always()
+        run: |
+          DATE="${BULLWHIP_DATE:-$(date -u +%F)}"
+          NIGHT="$PROJECT_DIR/logs/$DATE"
+          {
+            echo "## night $DATE"
+            echo
+            if [ -f "$NIGHT/status.json" ]; then
+              echo '```json'; cat "$NIGHT/status.json"; echo; echo '```'
+            fi
+            if [ -f "$NIGHT/ledger.json" ]; then
+              echo; echo "### ledger"; echo '```json'
+              python3 -c "import json; d=json.load(open('$NIGHT/ledger.json')); print(json.dumps({k: d[k] for k in ('runs','tables') if k in d}, indent=2, default=str)[:6000])"
+              echo '```'
+            fi
+            echo; echo "### query"; echo '```'
+            python3 "$PROJECT_DIR/query.py"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save warehouse, dlt state and nights
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            warehouse.duckdb
+            .dlt-data
+            ${{ env.PROJECT_DIR }}/logs
+          key: bullwhip-state-${{ github.run_id }}
+
+      - name: Upload tonight's logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: night-logs-${{ github.run_id }}
+          path: ${{ env.PROJECT_DIR }}/logs
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Build dashboards site
+        if: always()
+        run: bash scripts/build_site.sh "$PROJECT_DIR" site
+
+      - name: Upload Pages artifact
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  # Publishes web/ + logs/ so the dashboards read the real nights.  Skipped
+  # (green) until Pages is enabled with "GitHub Actions" as the source.
+  pages:
+    needs: night
+    if: always() && needs.night.result != 'cancelled'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Is Pages enabled?
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${{ github.repository }}/pages" >/dev/null 2>&1; then
+            echo "enabled=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::GitHub Pages is not enabled for this repository; skipping deploy (Settings → Pages → Source: GitHub Actions)."
+          fi
+      - uses: actions/configure-pages@v5
+        if: steps.check.outputs.enabled == '1'
+      - id: deploy
+        if: steps.check.outputs.enabled == '1'
+        uses: actions/deploy-pages@v4

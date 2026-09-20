@@ -1,0 +1,32 @@
+# bullwhip configuration — sourced by run_workflow.sh.
+# Copy to config/bullwhip.sh and edit.
+
+# Make targets that run every night in parallel.
+export BULLWHIP_TARGETS="scaffold"
+
+# Make targets that run after BULLWHIP_TARGETS (single job, e.g. backup).
+export BULLWHIP_FAILURE_TARGETS="backup"
+
+# Exceptions for the unused-target check.
+export BULLWHIP_EXCEPTIONS="^(nuke|clean.*|all|list-all-targets|logs/.*)$"
+
+# Entry point file(s) for the unused-file check.
+export BULLWHIP_ENTRY=""
+
+# Path to the project folder (used by the web UI).
+export BULLWHIP_PROJECT_DIR=""
+
+# Number of parallel make jobs (recommend: vCPU + 1).
+export BULLWHIP_PARALLEL_JOBS=6
+
+# Maximum retry attempts (23 ≈ 11.5 hours at 30-min cron intervals).
+export BULLWHIP_MAX_ATTEMPTS=23
+
+# Notification: "none", "slack", "email", "slack,email".
+export BULLWHIP_NOTIFY="none"
+
+# Slack webhook URL (required if BULLWHIP_NOTIFY includes slack).
+# export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
+
+# Start the live UI server during the night (0 = off, 1 = on, port 8765).
+export BULLWHIP_LIVE_UI=0
