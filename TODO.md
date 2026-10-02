@@ -5,11 +5,20 @@
 Order of support, and what each needs:
 
 1. **GitHub Actions** (`.github/workflows/nightly.yml`) — the primary way.
-   Built and verified locally (cold start, real API, fail-fast retries, GNU
-   make 4.4, Pages layout). Next steps, in order:
-   - [ ] `git init`, push, watch the first scheduled run; enable Pages
-   - [ ] after night 2, confirm `star_growth` gained a second row per repo
-         (the merge path, fixed 2026-09-17) and the cache round-tripped
+   Repo is live at `github.com/soobrosa/bullwhip` (public, pushed 2026-09-20).
+   First dispatch run: green — cold-runner persistence round-trip verified
+   from the attempt log (parquet restore → strict validate → 4/4 model
+   batches → fingerprinted backup re-export). `docker.yml` built and pushed
+   the GHCR image; the build-if-missing check re-verified on push 2.
+   Remaining, in order:
+   - [ ] Enable Pages: Settings → Pages → Source: "GitHub Actions"
+         (without it every nightly skips the dashboard deploy)
+   - [ ] Make the GHCR package public: Settings → Packages → `bullwhip` →
+         change visibility (packages pushed via GITHUB_TOKEN land private;
+         the K8s CronJob expects an anonymous pull)
+   - [ ] Watch the first *scheduled* run (03:00 UTC cron) end to end
+   - [ ] After night 2, confirm `star_growth` gained a second row per repo
+         (the merge path, fixed 2026-09-17)
 2. **Host cron** — the original; `bash lib/run_workflow.sh` in a crontab.
    Works as documented.
 3. **Kubernetes CronJob** (`deploy/k8s/cronjob.yaml`) — PVC for warehouse +
@@ -36,16 +45,13 @@ copy): `sqlmesh/config.yaml` reads `BULLWHIP_DUCKDB` via `env_var()`;
 - [ ] Redundancy review (the 24-item list) was applied only to E → F, not to
       a/b/c/d.
 - [ ] Confirm the dlt-ops upstream handle/link for the README `## Built on`
-      row before publishing.
+      row before publicizing.
 - [ ] Persistence model (2026-09-18): `data/*.parquet` is the durable copy;
       `warehouse.duckdb` is gitignored and rebuilt (restore → idempotent
-      re-ingest → model refresh) whenever missing. Verified in a scratch
-      copy: cold rebuild, backup skip-on-unchanged, stable row counts across
-      re-runs. Confirm the round-trip on the first Actions run.
-- [ ] `.github/workflows/nightly.yml` has not run on GitHub yet (repo not
-      pushed). Locally verified: cold start, real-API night, fail-fast retries,
-      GNU make 4.4, Pages layout under a `/<repo>/` prefix. `actions/cache` is
-      the one untested piece; eviction after 7 idle days means a cold warehouse
-      and a restarted `star_growth` history.
+      re-ingest → model refresh) whenever missing. Verified in scratch and on
+      the first Actions run (2026-09-20). `nightly.yml` no longer caches the
+      warehouse file (would mask a broken restore); dlt state + past nights'
+      logs are cached, so `actions/cache` eviction after 7 idle days means a
+      cold dlt state and a restarted ledger history.
 - [ ] `star_growth` deltas stay null until several nights of snapshots exist.
 - [ ] Fixture data gives every repo `bus = 1`; only the real API differentiates.
