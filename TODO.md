@@ -11,12 +11,17 @@ Order of support, and what each needs:
    batches → fingerprinted backup re-export). `docker.yml` built and pushed
    the GHCR image; the build-if-missing check re-verified on push 2.
    Remaining, in order:
-   - [ ] Enable Pages: Settings → Pages → Source: "GitHub Actions"
+   - [x] Enable Pages: Settings → Pages → Source: "GitHub Actions"
          (without it every nightly skips the dashboard deploy)
-   - [ ] Make the GHCR package public: Settings → Packages → `bullwhip` →
+   - [x] Make the GHCR package public: Settings → Packages → `bullwhip` →
          change visibility (packages pushed via GITHUB_TOKEN land private;
-         the K8s CronJob expects an anonymous pull)
-   - [ ] Watch the first *scheduled* run (03:00 UTC cron) end to end
+         the K8s CronJob expects an anonymous pull). Verified 2026-11-20:
+         anonymous manifest fetch of `ghcr.io/soobrosa/bullwhip:latest`
+         returns HTTP 200.
+   - [x] Watch the first *scheduled* run (03:00 UTC cron) end to end
+         — scheduled runs green daily since 2026-11-16; dashboard deploy
+         went live 2026-11-20 once Pages was enabled (first deploy was a
+         manual dispatch; https://soobrosa.info/bullwhip/)
    - [ ] After night 2, confirm `star_growth` gained a second row per repo
          (the merge path, fixed 2026-09-17)
 2. **Host cron** — the original; `bash lib/run_workflow.sh` in a crontab.

@@ -6,6 +6,42 @@ Modernized from the [original night-shift](https://github.com/soobrosa/night-shi
 (6Wunderkinder, 2013). The scheduler skeleton stays; the workers are replaced
 with modern tools. Three ledgers, three read-only projections, one cron line.
 
+## Why
+
+Every data team eventually needs a nightly batch pipeline: pull data,
+transform it, publish it. The default choices are heavyweight orchestrators
+(Airflow, Dagster) that demand their own infra and a dedicated operator, or a
+lone cron job that fails silently at 3am. bullwhip is for the space between:
+a small, boring, ownable pipeline one person can fully understand — and that
+tells you when the *data* is wrong, not just when the *code* is.
+
+## What it is, what it isn't
+
+It is:
+
+- A framework composing proven tools — cron + GNU Make + dlt-ops + SQLMesh +
+  DuckDB — no new runtime to learn.
+- Three honest ledgers (*what ran*, *what data arrived*, *what transforms
+  completed*); the dashboards and agent access are read-only projections of
+  them, never new state.
+- Built on the idea that **task success is not data success**: after every
+  run it records real row counts and load errors, so a green build with zero
+  records shows up as a failure.
+- Hygienic by default: content-hash fingerprints (re-running with edited
+  logic can't silently no-op against yesterday's marker) and
+  critical-path-aware scheduling (slow targets start first).
+
+It isn't:
+
+- An orchestrator platform — no UI for authoring; the DAG is a Makefile you
+  edit by hand.
+- For streaming or intra-day data — strictly nightly batch.
+- A distributed system — one machine, one DuckDB file.
+- A product or SaaS — you clone it, configure two shell files, and own it
+  entirely.
+
+The rest of this README is the reference.
+
 ## Architecture
 
 ```
@@ -73,6 +109,19 @@ bash lib/run_workflow.sh
 ```
 
 ### 4. Watch
+
+The dashboards are live on GitHub Pages, rebuilt from the latest night's
+artifacts by every run of `nightly.yml`:
+
+[picker](https://soobrosa.info/bullwhip/web/index.html?project=examples/github-health)
+· [a](https://soobrosa.info/bullwhip/web/a.html)
+· [b](https://soobrosa.info/bullwhip/web/b.html)
+· [c](https://soobrosa.info/bullwhip/web/c.html)
+· [d](https://soobrosa.info/bullwhip/web/d.html)
+· [e](https://soobrosa.info/bullwhip/web/e.html)
+· [f](https://soobrosa.info/bullwhip/web/f.html)
+
+Locally:
 
 ```bash
 # Serve the repo root (dashboards + logs + artifacts):
