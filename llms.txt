@@ -4,6 +4,30 @@
 > Modernized from the 2013 Wunderlist data pipeline. Three ledgers, three
 > read-only projections, one cron line.
 
+## Run the demo without a checkout
+
+On Linux or macOS with uv, Git, GNU Make, and Bash:
+
+```bash
+uvx --python 3.12 --from git+https://github.com/soobrosa/bullwhip.git@main bullwhip demo --json
+```
+
+This runs the actual GitHub health pipeline with bundled fixture data. No
+GitHub token, scheduler, or service is needed. The first `uvx` run downloads
+the CLI and its dependencies. `demo` writes only to a new workspace. It picks
+a temporary directory unless you pass `--directory PATH` (a path that doesn't
+exist yet).
+
+Read the JSON on stdout. `ledger.records_loaded` and `ledger.errors` describe
+the load, `repos` contains the scored rows, `dag.targets` describes the Make
+DAG, and `logs` points to the run logs. Failures exit nonzero and report on
+stderr. To inspect the results again without running the pipeline, pass the
+returned `directory` to:
+
+```bash
+uvx --python 3.12 --from git+https://github.com/soobrosa/bullwhip.git@main bullwhip inspect "<directory from demo JSON>" --json
+```
+
 ## What it is
 
 bullwhip is a skeleton for nightly batch data pipelines. It uses cron for
@@ -76,7 +100,7 @@ cron (every 30 min, 00:00–06:00)
 - Slack: failure ping (v0) + morning digest (v1)
 - MCP (stdio): night_status, night_stats, list_targets, night_summary, get_target_log, explain_critical_path
 
-## Quick start
+## Run from a source checkout
 
 ```bash
 pip install -e ".[dev]"
@@ -109,7 +133,7 @@ Runtime, non-Python:
 - uv (Astral) — dependency install in the Action
 - GitHub REST API — the example's data source (GITHUB_TOKEN, PAT, or GITHUB_HEALTH_FIXTURE=1 for none)
 - Slack incoming webhooks — optional failure ping / morning digest
-- Python 3.11+
+- Python 3.11–3.13
 
 Dashboards and agent access:
 - Observable Plot (@observablehq/plot@0.4, jsDelivr) — dashboard B's Gantt

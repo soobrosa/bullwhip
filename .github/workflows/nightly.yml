@@ -73,7 +73,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
 
       - name: Install dependencies
-        # The repo is not a package (flat layout); install its dependency list.
+        # The scheduler runs from the checkout, so only install dependencies.
         run: uv pip install --system -r pyproject.toml
 
       - name: Restore dlt state and past nights

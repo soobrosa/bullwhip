@@ -1,12 +1,46 @@
-# bullwhip
+# bullwhip: standalone batch pipeline CLI
 
-A nightly batch data-pipeline framework: **cron + GNU Make + dlt-ops + SQLMesh**.
+Run a local demo with `uvx`, no manual clone, PyPI release, or credentials
+required. The CLI can return JSON for scripts and LLMs.
 
-Modernized from the [original night-shift](https://github.com/soobrosa/night-shift)
-(6Wunderkinder, 2013). The scheduler skeleton stays; the workers are replaced
-with modern tools. Three ledgers, three read-only projections, one cron line.
+## Try it with `uvx`
+
+From any directory on Linux or macOS with [uv](https://docs.astral.sh/uv/),
+Git, GNU Make, and Bash:
+
+```bash
+uvx --python 3.12 --from git+https://github.com/soobrosa/bullwhip.git@main bullwhip demo --json
+```
+
+`uvx` installs the CLI from GitHub into its own environment. There is no
+checkout to manage and no PyPI release to install. The first invocation needs
+network access to install dependencies. The demo itself uses local fixture
+data, runs Make, dlt-ops, and SQLMesh, and writes a DuckDB warehouse and logs
+in a new temporary directory. It does not use GitHub credentials or start a
+service.
+
+For an LLM or script, `--json` returns one object on stdout. Check
+`ledger.records_loaded`, `ledger.errors`, and `repos` for the data outcome.
+`dag.targets` describes the executed pipeline's dependency graph, and `logs`
+points to the attempt, timing, and per-target logs. To read the same result
+without rerunning the pipeline:
+
+```bash
+uvx --python 3.12 --from git+https://github.com/soobrosa/bullwhip.git@main bullwhip inspect "<directory from demo JSON>" --json
+```
+
+Omit `--json` for a short human-readable summary. Pass `demo --directory PATH`
+to choose where the demo writes files; the directory must not already exist.
+The workspace is kept for inspection. Failures exit nonzero and report
+diagnostics on stderr. To use a fixed version, replace `@main` with a Git
+commit SHA.
 
 ## Why
+
+Bullwhip combines **cron, GNU Make, dlt-ops, and SQLMesh** for nightly
+batch pipelines. It keeps the scheduling design of the
+[original night-shift](https://github.com/soobrosa/night-shift)
+(6Wunderkinder, 2013) and replaces its workers with modern tools.
 
 Every data team eventually needs a nightly batch pipeline: pull data,
 transform it, publish it. The default choices are heavyweight orchestrators
@@ -37,8 +71,8 @@ It isn't:
   edit by hand.
 - For streaming or intra-day data — strictly nightly batch.
 - A distributed system — one machine, one DuckDB file.
-- A product or SaaS — you clone it, configure two shell files, and own it
-  entirely.
+- A product or SaaS — the demo runs locally, and you own your production
+  configuration and data.
 
 The rest of this README is the reference.
 
@@ -68,7 +102,7 @@ cron (every 30 min, 00:00–06:00)
 | Priority + content sensitivity at the make layer | the three Mara organs |
 | Observability / notification / agent access | projections of the ledgers |
 
-## Quick start
+## Configure a production pipeline from the source tree
 
 ### 1. Install dependencies
 
@@ -296,7 +330,7 @@ Runtime, non-Python:
 | **uv** (Astral) | Dependency install in the Action |
 | **GitHub REST API** | The example's data source (`GITHUB_TOKEN` in the Action, a PAT locally, or `GITHUB_HEALTH_FIXTURE=1` for none) |
 | **Slack incoming webhooks** | Optional failure ping / morning digest |
-| **Python 3.11+** | The runtime |
+| **Python 3.11–3.13** | The runtime (Python 3.12 recommended for `uvx`) |
 
 Dashboards and agent access:
 
@@ -315,6 +349,7 @@ Dev only: `pytest`, `pytest-cov`, TypeScript + `@types/node` (mcp), Homebrew
 ```bash
 python -m pytest tests/ -v    # unit tests
 bash tests/run.sh             # full test suite + makefile hygiene
+BULLWHIP_TEST_UVX=1 python -m pytest tests/test_uvx_cli.py -v  # package smoke test
 ```
 
 ## License

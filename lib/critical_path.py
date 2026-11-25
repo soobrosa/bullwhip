@@ -74,9 +74,9 @@ def parse_make_dag(makefile_dir: str = ".") -> dict[str, Target]:
                 current_target = None
                 continue
             name = m.group(1)
-            # Special targets (.PHONY, .SUFFIXES, .DEFAULT, ...) and stale
-            # suffix rules all start with a dot.
-            if name.startswith("."):
+            # Skip make's special targets and suffix rules, not relative
+            # file targets such as ../../warehouse.duckdb.
+            if name.startswith(".") and "/" not in name:
                 current_target = None
                 continue
             # "|" separates order-only prerequisites; they still gate the
@@ -173,7 +173,7 @@ def scope_to_entries(
     reachable: set[str] = set()
     while stack:
         name = stack.pop()
-        if name in reachable:
+        if name in reachable or name not in targets:
             continue
         reachable.add(name)
         stack.extend(targets[name].deps)

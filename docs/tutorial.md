@@ -4,6 +4,10 @@ This tutorial walks through building a real pipeline that scrapes GitHub's
 daily trending repos and tracks their stars, growth, and health metrics. It
 serves as both the runnable example and the getting-started guide.
 
+To try the fixture pipeline without a checkout or configuration, start with
+the [standalone CLI demo](../README.md#try-it-with-uvx). The steps below are
+for working on the pipeline from the source tree.
+
 ## What we're building
 
 A nightly pipeline that:
@@ -28,7 +32,7 @@ make query                                                 (you, in the morning)
 
 ## Prerequisites
 
-- Python 3.11+
+- Python 3.11–3.13
 - GNU Make (macOS system make works; gmake 4.4+ in the Docker image for `.WAIT` waves)
 - No GitHub token needed for fixture mode
 

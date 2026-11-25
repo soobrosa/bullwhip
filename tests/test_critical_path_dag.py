@@ -117,6 +117,22 @@ def test_scope_to_entries_keeps_reachable_only():
     assert "backfill" not in scoped and "status" not in scoped
 
 
+def test_scope_to_entries_with_relative_target_and_input_file(tmp_path):
+    example = tmp_path / "examples" / "fixture"
+    example.mkdir(parents=True)
+    (tmp_path / "input.csv").touch()
+    (example / "Makefile").write_text(
+        "imports: | ../../warehouse.duckdb\n"
+        "../../warehouse.duckdb: ../../input.csv\n"
+        "\ttouch $@\n"
+    )
+    targets = critical_path.parse_make_dag(str(example))
+    scoped = critical_path.scope_to_entries(targets, ["imports"])
+    assert set(scoped) == {"imports", "../../warehouse.duckdb"}
+    assert scoped["imports"].deps == ["../../warehouse.duckdb"]
+    assert scoped["../../warehouse.duckdb"].deps == ["../../input.csv"]
+
+
 def test_scope_to_entries_empty_or_unknown_returns_all():
     """No entries (or none matching) falls back to the unscoped DAG."""
     targets = {"a": critical_path.Target(name="a"), "b": critical_path.Target(name="b")}

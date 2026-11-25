@@ -1,0 +1,9 @@
+# The standalone demo ships only the github_health source.
+[dlt_ops]
+default_destination = "duckdb"
+default_dataset = "my_db"
+
+[sources.github_health.dlt_ops]
+schedule = "@manual"
+destination = "duckdb"
+dataset = "my_db"
