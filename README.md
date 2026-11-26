@@ -1,7 +1,25 @@
 # bullwhip: standalone batch pipeline CLI
 
-Run a local demo with `uvx`, no manual clone, PyPI release, or credentials
-required. The CLI can return JSON for scripts and LLMs.
+Read live daily GitHub Trending results as JSON or run the offline demo
+with `uvx`. No manual clone, PyPI release, or credentials required.
+
+## Daily GitHub Trending JSON
+
+```bash
+uvx --python 3.12 --from git+https://github.com/soobrosa/bullwhip.git@main bullwhip daily
+```
+
+`daily` prints one JSON object with the snapshot's UTC `date`, its `source`,
+and `repos` in GitHub Trending rank order. Each repo has its rank, name
+(`full_name`), total stars, stars gained that day, and language. It reads the
+latest successful live snapshot published by the nightly workflow, scheduled
+for 03:00 UTC. Unlike `demo`, it needs an internet connection but doesn't run
+the pipeline or use a GitHub token.
+
+Use `daily --date YYYY-MM-DD` to read a specific published day. If a nightly
+run fails or hasn't published yet, `daily` still reports the last published
+date. A missing requested date exits nonzero. History begins when this export
+is first deployed and is retained with the nightly logs (best effort).
 
 ## Try it with `uvx`
 

@@ -4,6 +4,19 @@
 > Modernized from the 2013 Wunderlist data pipeline. Three ledgers, three
 > read-only projections, one cron line.
 
+## Read the daily live GitHub Trending rankings
+
+```bash
+uvx --python 3.12 --from git+https://github.com/soobrosa/bullwhip.git@main bullwhip daily
+```
+
+`daily` prints one JSON object: `date` (UTC), `source`, and `repos` in GitHub
+Trending rank order. The repos are from the latest successfully published live
+night (scheduled for 03:00 UTC), not the offline demo fixtures. Check `date`
+before calling the results today's. Add `--date YYYY-MM-DD` to request a
+specific published day; an unavailable date exits nonzero and reports on
+stderr. No GitHub token or local warehouse is needed.
+
 ## Run the demo without a checkout
 
 On Linux or macOS with uv, Git, GNU Make, and Bash:

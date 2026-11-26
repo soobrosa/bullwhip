@@ -1,4 +1,4 @@
-"""Run and inspect the bundled GitHub health pipeline."""
+"""Run the GitHub health demo or read published nightly rankings."""
 
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ import sys
 import tempfile
 from datetime import date, datetime, timezone
 from pathlib import Path
+
+from .daily import fetch_snapshot, snapshot_date
 
 
 EXAMPLE = Path("examples/github-health")
@@ -140,8 +142,13 @@ def main() -> int:
     inspect.add_argument("directory", type=Path, help="workspace printed by demo")
     for command in (demo, inspect):
         command.add_argument("--json", action="store_true", help="print one JSON object to stdout")
+    daily = commands.add_parser("daily", help="print published GitHub Trending rankings as JSON")
+    daily.add_argument("--date", type=snapshot_date, help="snapshot date in UTC (default: latest published)")
     args = parser.parse_args()
     try:
+        if args.command == "daily":
+            print(json.dumps(fetch_snapshot(args.date)))
+            return 0
         if args.command == "demo":
             result = run_demo(args.directory)
         else:

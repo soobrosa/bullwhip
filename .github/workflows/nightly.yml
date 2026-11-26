@@ -98,6 +98,18 @@ jobs:
           done
           exit 1
 
+      - name: Export daily GitHub Trending snapshot
+        if: success() && env.GITHUB_HEALTH_FIXTURE == '0'
+        run: |
+          TODAY="$(date -u +%F)"
+          DATE="${BULLWHIP_DATE:-$TODAY}"
+          if [ "$DATE" != "$TODAY" ]; then
+            echo "Skipping daily export: a historical dispatch does not fetch historical GitHub Trending data."
+            exit 0
+          fi
+          python -m bullwhip.daily --warehouse warehouse.duckdb --date "$DATE" \
+            --output "$PROJECT_DIR/logs/$DATE/trending.json"
+
       - name: Summary
         if: always()
         run: |

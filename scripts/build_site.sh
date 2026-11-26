@@ -24,6 +24,18 @@ else
     echo "[]" > "$OUT/$PROJECT/logs/index.json"
 fi
 
+# Do not use the dashboard index: it also lists failed and fixture runs.
+# ISO date directories sort oldest first; the last successful export wins.
+latest=
+for snapshot in "$OUT/$PROJECT/logs"/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/trending.json; do
+    if [ -f "$snapshot" ]; then
+        latest="$snapshot"
+    fi
+done
+if [ -n "$latest" ]; then
+    cp "$latest" "$OUT/$PROJECT/logs/trending-latest.json"
+fi
+
 # Pages serves an index at the root; send it to the picker for this project.
 cat > "$OUT/index.html" <<EOF
 <!doctype html>
