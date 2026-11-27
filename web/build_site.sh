@@ -2,7 +2,7 @@
 # build_site.sh — assemble a static copy of the dashboards plus one project's
 # night artifacts, for GitHub Pages (or any file server).
 #
-#   scripts/build_site.sh [project-dir] [out-dir]
+#   web/build_site.sh [project-dir] [out-dir]
 #
 # Layout mirrors the repo so web/shared.js's relative paths (../<project>/logs/)
 # resolve the same way they do under `python3 -m http.server` at the root.
@@ -11,7 +11,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-PROJECT="${1:-${BULLWHIP_PROJECT_DIR:-examples/github-health}}"
+PROJECT="${1:-${BULLWHIP_PROJECT_DIR:-pipeline/examples/github-health}}"
 OUT="${2:-site}"
 
 rm -rf "$OUT"

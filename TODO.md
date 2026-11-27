@@ -24,9 +24,9 @@ Order of support, and what each needs:
          manual dispatch; https://soobrosa.info/bullwhip/)
    - [ ] After night 2, confirm `star_growth` gained a second row per repo
          (the merge path, fixed 2026-09-17)
-2. **Host cron** — the original; `bash lib/run_workflow.sh` in a crontab.
+2. **Host cron** — the original; `bash pipeline/lib/run_workflow.sh` in a crontab.
    Works as documented.
-3. **Kubernetes CronJob** (`deploy/k8s/cronjob.yaml`) — PVC for warehouse +
+3. **Kubernetes CronJob** (`config/k8s/cronjob.yaml`) — PVC for warehouse +
    dlt state + logs, `concurrencyPolicy: Forbid`, `backoffLimit: 2` with
    `BULLWHIP_FAIL_FAST=1`, Secret → env, optional dashboard Deployment on
    the same claim. **Not applied to a cluster** (no kubectl here). The image
@@ -39,7 +39,7 @@ Order of support, and what each needs:
    installed on this machine.
 
 Enablers added for 3 and 4 (verified with a relocated warehouse in a scratch
-copy): `sqlmesh/config.yaml` reads `BULLWHIP_DUCKDB` via `env_var()`;
+copy): `pipeline/sqlmesh/config.yaml` reads `BULLWHIP_DUCKDB` via `env_var()`;
 `config/bullwhip.sh` no longer overrides it. `BULLWHIP_DUCKDB` and
 `DESTINATION__DUCKDB__CREDENTIALS` must point at the same file.
 
@@ -51,7 +51,7 @@ copy): `sqlmesh/config.yaml` reads `BULLWHIP_DUCKDB` via `env_var()`;
       a/b/c/d.
 - [ ] Confirm the dlt-ops upstream handle/link for the README `## Built on`
       row before publicizing.
-- [ ] Persistence model (2026-09-18): `data/*.parquet` is the durable copy;
+- [ ] Persistence model (2026-09-18): `pipeline/data/*.parquet` is the durable copy;
       `warehouse.duckdb` is gitignored and rebuilt (restore → idempotent
       re-ingest → model refresh) whenever missing. Verified in scratch and on
       the first Actions run (2026-09-20). `nightly.yml` no longer caches the

@@ -1,4 +1,4 @@
-"""Tests for lib/warehouse_parquet.py — export/restore round trip."""
+"""Tests for pipeline/lib/warehouse_parquet.py — export/restore round trip."""
 
 import sys
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline" / "lib"))
 
 import warehouse_parquet as wp  # noqa: E402
 

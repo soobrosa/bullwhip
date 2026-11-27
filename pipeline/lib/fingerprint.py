@@ -10,17 +10,18 @@ yesterday's marker: the old dated-target system only knew *when* a target
 ran, never *whether the inputs changed*.
 
 Usage in a Makefile recipe (check and work MUST share one shell — make runs
-each recipe line in its own shell, so a bare `exit 0` cannot skip the rest):
-    intermediate/$(TODAY)/my_target.done: | scaffold
-    	@python lib/fingerprint.py --check --target $@ \
-    		--recipe "$(strip $(MAKECMD))" \
-    		--deps "$(filter %.py %.sql %.sh,$^)" \
-    	|| { \
-    		# ... actual recipe ...; \
-    		python lib/fingerprint.py --write --target $@ \
-    			--recipe "$(strip $(MAKECMD))" \
-    			--deps "$(filter %.py %.sql %.sh,$^)"; \
-    	}
+each recipe line in its own shell, so a bare `exit 0` cannot skip the rest;
+recipe lines below start with a literal tab, as make requires):
+intermediate/$(TODAY)/my_target.done: | scaffold
+	@python pipeline/lib/fingerprint.py --check --target $@ \
+	    --recipe "$(strip $(MAKECMD))" \
+	    --deps "$(filter %.py %.sql %.sh,$^)" \
+	|| { \
+	    # ... actual recipe ...; \
+	    python pipeline/lib/fingerprint.py --write --target $@ \
+	        --recipe "$(strip $(MAKECMD))" \
+	        --deps "$(filter %.py %.sql %.sh,$^)"; \
+	}
 
 Scope: exports, backups, notifications, and any target whose inputs aren't
 file-mtimes.  SQLMesh and dlt manage their own state; they don't need this.

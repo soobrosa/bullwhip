@@ -1,4 +1,4 @@
-"""Tests for lib/run_ledger.py — the outcome record (Mara organ 3)."""
+"""Tests for pipeline/lib/run_ledger.py — the outcome record (Mara organ 3)."""
 
 import json
 import subprocess
@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline" / "lib"))
 
 import run_ledger
 

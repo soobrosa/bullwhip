@@ -207,7 +207,7 @@ function explainCriticalPath(date?: string): string {
 
   if (!dag) {
     return JSON.stringify({
-      error: "No dag.json found. Run `python lib/critical_path.py` to generate it.",
+      error: "No dag.json found. Run `python pipeline/lib/critical_path.py` to generate it.",
     });
   }
 

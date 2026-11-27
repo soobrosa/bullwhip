@@ -136,7 +136,7 @@ done
 write_status "$MAKE_EXIT_CODES"
 
 # Outcome record: what the data layer says happened tonight (best effort).
-python3 "$BULLWHIP_ROOT/lib/run_ledger.py" --root "$BULLWHIP_ROOT" \
+python3 "$BULLWHIP_ROOT/pipeline/lib/run_ledger.py" --root "$BULLWHIP_ROOT" \
     --since "$NIGHT_STARTED_AT" --out "logs/${DATE}/ledger.json" \
     ${BULLWHIP_DUCKDB:+--duckdb "$BULLWHIP_DUCKDB"} \
     ${BULLWHIP_DATASET:+--dataset "$BULLWHIP_DATASET"} >> "$THIS_ATTEMPT" 2>&1 || true
@@ -144,7 +144,7 @@ python3 "$BULLWHIP_ROOT/lib/run_ledger.py" --root "$BULLWHIP_ROOT" \
 # Refresh the DAG with tonight's timings so the UI's critical path is current.
 # Scoped to the targets the night runs (plus cleanup) so dag.json doesn't
 # include helper targets make never touches.
-python3 "$BULLWHIP_ROOT/lib/critical_path.py" --makefile-dir . --log-dir logs \
+python3 "$BULLWHIP_ROOT/pipeline/lib/critical_path.py" --makefile-dir . --log-dir logs \
     --targets "$BULLWHIP_TARGETS $BULLWHIP_FAILURE_TARGETS cleanup" \
     --dag-output "logs/${DATE}/dag.json" >> "$THIS_ATTEMPT" 2>&1 || true
 
@@ -169,7 +169,7 @@ if [ "$ATTEMPT_COUNT" -ge "$BULLWHIP_MAX_ATTEMPTS" ]; then
 
         # Slack notification on final failure.
         if [ "$BULLWHIP_NOTIFY" = "slack" ] || [ "$BULLWHIP_NOTIFY" = "slack,email" ]; then
-            python3 "$BULLWHIP_ROOT/lib/notify_slack.py" --date "$DATE" --exit-code "$MAKE_EXIT_CODES" \
+            python3 "$BULLWHIP_ROOT/pipeline/lib/notify_slack.py" --date "$DATE" --exit-code "$MAKE_EXIT_CODES" \
                 --webhook "$SLACK_WEBHOOK_URL" 2>/dev/null || true
         fi
 
@@ -187,7 +187,7 @@ if [ "$ATTEMPT_COUNT" -ge "$BULLWHIP_MAX_ATTEMPTS" ]; then
 
     # Slack morning digest on success.
     if [ "$BULLWHIP_NOTIFY" = "slack" ] || [ "$BULLWHIP_NOTIFY" = "slack,email" ]; then
-        python3 "$BULLWHIP_ROOT/lib/notify_slack.py" --date "$DATE" --digest --webhook "$SLACK_WEBHOOK_URL" 2>/dev/null || true
+        python3 "$BULLWHIP_ROOT/pipeline/lib/notify_slack.py" --date "$DATE" --digest --webhook "$SLACK_WEBHOOK_URL" 2>/dev/null || true
     fi
 
     # Mark the night as finished.

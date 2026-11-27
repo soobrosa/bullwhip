@@ -324,7 +324,7 @@ def github_health():
         """Daily star count snapshot — for growth tracking.
 
         Merge-keyed on (full_name, snapshot_date) so re-ingesting after a
-        warehouse rebuild (data/*.parquet is the durable copy) stays
+        warehouse rebuild (pipeline/data/*.parquet is the durable copy) stays
         idempotent instead of duplicating same-day rows.
         """
         if use_fixture:

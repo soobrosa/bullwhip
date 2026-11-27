@@ -7,7 +7,7 @@
 # exits.  Cron does not run inside it; schedule from outside, e.g. a host
 # crontab line `*/30 0-5 * * * docker compose -f /path/docker-compose.yml run
 # --rm bullwhip`, or use the GitHub Action / Kubernetes CronJob
-# (deploy/k8s/cronjob.yaml) instead.
+# (config/k8s/cronjob.yaml) instead.
 #
 # Usage:
 #   docker compose build

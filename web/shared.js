@@ -1,7 +1,7 @@
 // shared.js — loads one night's artifacts and derives a single view model.
 //
 // Every dashboard (a/b/c/d.html) imports this and only differs in rendering.
-// Inputs, all written by lib/ during the night, served by plain http.server
+// Inputs, all written by pipeline/lib/ during the night, served by plain http.server
 // from the repo root:
 //   <project>/logs/<date>/status.json      run_workflow.sh heartbeat
 //   <project>/logs/<date>/timing_env.log   tracking_shell BEGIN/END records

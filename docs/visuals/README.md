@@ -2,7 +2,7 @@
 
 Every screenshot here was rendered by headless Chrome from the live dashboard
 files (`web/*.html`) while they read artifacts produced by genuine runs of
-`bash lib/run_workflow.sh` against `examples/github-health` (fixture mode,
+`bash pipeline/lib/run_workflow.sh` against `pipeline/examples/github-health` (fixture mode,
 unless noted). No image below was hand-drawn, AI-generated, or edited.
 
 | File | Dashboard | Night | What happened |
@@ -28,10 +28,10 @@ Known gap: `b-success.png` / `b-failure.png` show B's chrome only. B's chart
 libraries fail to load (wrong ESM import), so its Gantt and DAG sections are
 empty in those shots. Left as-is until B is fixed.
 
-The raw artifacts backing these are in `examples/github-health/logs/<date>/`.
+The raw artifacts backing these are in `pipeline/examples/github-health/logs/<date>/`.
 Reproduce any shot:
 
 ```bash
 python -m http.server 8765 -d .
-open "http://localhost:8765/web/d.html?project=examples/github-health&date=2026-09-07"
+open "http://localhost:8765/web/d.html?project=pipeline/examples/github-health&date=2026-09-07"
 ```

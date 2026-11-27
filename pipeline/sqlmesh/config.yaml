@@ -14,7 +14,7 @@ gateways:
   prod:
     connection:
       type: duckdb
-      database: {{ env_var('BULLWHIP_DUCKDB', '../warehouse.duckdb') }}
+      database: {{ env_var('BULLWHIP_DUCKDB', '../../warehouse.duckdb') }}
 
 default_gateway: prod
 

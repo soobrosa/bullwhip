@@ -15,7 +15,7 @@ from pathlib import Path
 from .daily import fetch_snapshot, snapshot_date
 
 
-EXAMPLE = Path("examples/github-health")
+EXAMPLE = Path("pipeline/examples/github-health")
 
 
 def copy_demo(root: Path) -> None:
@@ -37,7 +37,7 @@ def copy_demo(root: Path) -> None:
             else:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source / name, target)
-    (root / "lib/tracking_shell.py").chmod(0o755)
+    (root / "pipeline/lib/tracking_shell.py").chmod(0o755)
 
 
 def inspect_demo(root: Path, night: str) -> dict:
@@ -105,12 +105,12 @@ def run_demo(root: Path | None) -> dict:
     commands = [
         (example, ["make", "-k", "imports", "backup"]),
         (root, [
-            sys.executable, "lib/run_ledger.py", "--since",
+            sys.executable, "pipeline/lib/run_ledger.py", "--since",
             datetime.now(timezone.utc).isoformat(), "--duckdb", str(warehouse),
             "--out", str(logs / "ledger.json"),
         ]),
         (root, [
-            sys.executable, "lib/critical_path.py", "--makefile-dir", str(example),
+            sys.executable, "pipeline/lib/critical_path.py", "--makefile-dir", str(example),
             "--log-dir", str(logs.parent), "--targets", "imports backup",
             "--dag-output", str(logs / "dag.json"),
         ]),

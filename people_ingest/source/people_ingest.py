@@ -1,4 +1,4 @@
-"""people_ingest source — minimal example for examples/incremental_load.
+"""people_ingest source — minimal example for pipeline/examples/incremental_load.
 
 One resource, a declared schema, append disposition: the smallest surface
 that still exercises the dlt-ops path (validate, assertions, runs ledger).

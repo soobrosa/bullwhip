@@ -9,9 +9,15 @@ it is not a request to rebuild the existing project.
 ## Project boundaries
 
 - Keep cross-system dependencies in GNU Make. The scheduler
-  (`lib/run_workflow.sh` or GitHub Actions) owns cadence, retries, and locking.
+  (`pipeline/lib/run_workflow.sh` or GitHub Actions) owns cadence, retries,
+  and locking.
   dlt-ops owns ingestion and load outcomes. SQLMesh owns warehouse transforms
   and their state. A successful Make recipe is not evidence of a good load.
+- The pipeline runtime lives under `pipeline/` (`lib/`, `sqlmesh/`, `data/`,
+  `examples/`). The dlt source packages (`github_health/`, `people_ingest/`)
+  and `.dlt/` must stay at the repo root: dlt-ops discovers sources by
+  scanning the immediate subdirectories of the directory holding
+  `.dlt/config.toml`, with no path override.
 - `bullwhip/cli.py` is the packaged entry point. If the demo starts using a
   new pipeline file, check the wheel's `force-include` and uv cache keys in
   `pyproject.toml`. Do not package local credentials, warehouses, or logs.
@@ -19,7 +25,7 @@ it is not a request to rebuild the existing project.
   configuration. `inspect` must not rerun the demo or write to its workspace.
   JSON commands emit one object on stdout; diagnostics go to stderr.
 - `bullwhip/daily.py`, `.github/workflows/nightly.yml`, and
-  `scripts/build_site.sh` form the live snapshot path. Keep fixtures and
+  `web/build_site.sh` form the live snapshot path. Keep fixtures and
   failed or historical runs out of the published ranking. Do not silently
   substitute a different date when `daily --date` requests a missing day.
 - Treat DuckDB files, local pipeline state, logs, and site output as generated.

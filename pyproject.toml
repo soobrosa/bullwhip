@@ -35,17 +35,17 @@ packages = ["bullwhip"]
 # warehouse contents, or logs.
 [tool.hatch.build.targets.wheel.force-include]
 "config/demo.dlt.toml" = "bullwhip/_demo/.dlt/config.toml"
-"examples/github-health/makefile" = "bullwhip/_demo/examples/github-health/makefile"
+"pipeline/examples/github-health/makefile" = "bullwhip/_demo/pipeline/examples/github-health/makefile"
 "github_health/resource/__init__.py" = "bullwhip/_demo/github_health/resource/__init__.py"
 "github_health/source/github_health.py" = "bullwhip/_demo/github_health/source/github_health.py"
-"lib/boilerplate.mk" = "bullwhip/_demo/lib/boilerplate.mk"
-"lib/critical_path.py" = "bullwhip/_demo/lib/critical_path.py"
-"lib/fingerprint.py" = "bullwhip/_demo/lib/fingerprint.py"
-"lib/run_ledger.py" = "bullwhip/_demo/lib/run_ledger.py"
-"lib/tracking_shell.py" = "bullwhip/_demo/lib/tracking_shell.py"
-"lib/warehouse_parquet.py" = "bullwhip/_demo/lib/warehouse_parquet.py"
-"sqlmesh/config.yaml" = "bullwhip/_demo/sqlmesh/config.yaml"
-"sqlmesh/models" = "bullwhip/_demo/sqlmesh/models"
+"pipeline/lib/boilerplate.mk" = "bullwhip/_demo/pipeline/lib/boilerplate.mk"
+"pipeline/lib/critical_path.py" = "bullwhip/_demo/pipeline/lib/critical_path.py"
+"pipeline/lib/fingerprint.py" = "bullwhip/_demo/pipeline/lib/fingerprint.py"
+"pipeline/lib/run_ledger.py" = "bullwhip/_demo/pipeline/lib/run_ledger.py"
+"pipeline/lib/tracking_shell.py" = "bullwhip/_demo/pipeline/lib/tracking_shell.py"
+"pipeline/lib/warehouse_parquet.py" = "bullwhip/_demo/pipeline/lib/warehouse_parquet.py"
+"pipeline/sqlmesh/config.yaml" = "bullwhip/_demo/pipeline/sqlmesh/config.yaml"
+"pipeline/sqlmesh/models" = "bullwhip/_demo/pipeline/sqlmesh/models"
 
 # uv's normal local build cache only watches package metadata.
 [tool.uv]
@@ -54,19 +54,19 @@ cache-keys = [
     { file = "README.md" },
     { file = "bullwhip/*.py" },
     { file = "config/demo.dlt.toml" },
-    { file = "examples/github-health/makefile" },
+    { file = "pipeline/examples/github-health/makefile" },
     { file = "github_health/**/*.py" },
-    { file = "lib/*" },
-    { file = "sqlmesh/config.yaml" },
-    { file = "sqlmesh/models/*.sql" },
+    { file = "pipeline/lib/*" },
+    { file = "pipeline/sqlmesh/config.yaml" },
+    { file = "pipeline/sqlmesh/models/*.sql" },
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["lib"]
-omit = ["lib/dlt_ops_fallback.py"]
+source = ["pipeline/lib"]
+omit = ["pipeline/lib/dlt_ops_fallback.py"]
 
 [tool.coverage.report]
 show_missing = true

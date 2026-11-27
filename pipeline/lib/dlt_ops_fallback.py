@@ -9,13 +9,13 @@ The primary path is the `dlt-ops` package (pip install dlt-ops), which ships:
   - custom predicates, TOML-declared assertions
 
 This file exists so that if dlt-ops ever breaks or feels heavy, you can
-swap `dlt-ops pipeline run` for `python lib/dlt_ops_fallback.py` in the
+swap `dlt-ops pipeline run` for `python pipeline/lib/dlt_ops_fallback.py` in the
 makefile and keep the three ideas that matter: assertions, runs ledger,
 and the hard/soft failure split.  It is deliberately incomplete — the
 full feature set is why we depend on dlt-ops.
 
 Usage (escape hatch only):
-    python lib/dlt_ops_fallback.py --config config/duckdb.sh \
+    python pipeline/lib/dlt_ops_fallback.py --config config/duckdb.sh \
         --source people_ingest --table people \
         --assertion "row_count:min=0" --assertion "unique:id" \
         --write-disposition merge

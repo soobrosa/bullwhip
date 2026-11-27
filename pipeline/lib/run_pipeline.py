@@ -6,10 +6,10 @@ The make target stays a dated-file idempotency marker; dlt's own state
 (loaded windows, incremental cursors) lives in the destination.
 
 Usage:
-    python lib/run_pipeline.py --config config/duckdb.sh \
+    python pipeline/lib/run_pipeline.py --config config/duckdb.sh \
         --source my_source.people --write-disposition merge
 
-    python lib/run_pipeline.py --config config/duckdb.sh \
+    python pipeline/lib/run_pipeline.py --config config/duckdb.sh \
         --source sql_database --table people \
         --incremental updated_at --write-disposition merge
 """

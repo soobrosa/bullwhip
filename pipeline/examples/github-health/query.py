@@ -8,8 +8,8 @@ import duckdb
 
 
 def main():
-    # Warehouse lives at the project root (../../warehouse.duckdb from here).
-    warehouse = Path(__file__).resolve().parent.parent.parent / "warehouse.duckdb"
+    # Warehouse lives at the repo root (../../../warehouse.duckdb from here).
+    warehouse = Path(__file__).resolve().parents[3] / "warehouse.duckdb"
     try:
         conn = duckdb.connect(str(warehouse), read_only=True)
         rows = conn.execute("""

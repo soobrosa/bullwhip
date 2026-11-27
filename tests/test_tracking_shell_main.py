@@ -15,7 +15,7 @@ from unittest import mock
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline" / "lib"))
 
 import tracking_shell  # noqa: E402
 

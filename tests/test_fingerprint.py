@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline" / "lib"))
 
 
 def test_compute_hash_deterministic():
@@ -76,7 +76,7 @@ def test_fingerprint_cli_check():
     """The CLI --check exits 0 on match, 1 on mismatch."""
     import subprocess
 
-    fp_script = str(Path(__file__).resolve().parent.parent / "lib" / "fingerprint.py")
+    fp_script = str(Path(__file__).resolve().parent.parent / "pipeline" / "lib" / "fingerprint.py")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         target = os.path.join(tmpdir, "marker.done")

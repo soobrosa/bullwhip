@@ -18,7 +18,7 @@ from bullwhip import cli, daily
 FIRST = "2026-11-25"
 SECOND = "2026-11-26"
 MISSING = "2026-11-27"
-PROJECT = "examples/github-health"
+PROJECT = "pipeline/examples/github-health"
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -39,11 +39,10 @@ def test_daily_export_and_cli(tmp_path, monkeypatch, capsys):
             ) t(snapshot_date, rank, full_name, total_stars, stars_today, language, _dlt_load_id)
         """)
     checkout = tmp_path / "checkout"
-    (checkout / "scripts").mkdir(parents=True)
     source = Path(__file__).resolve().parents[1]
-    builder = checkout / "scripts/build_site.sh"
-    shutil.copyfile(source / "scripts/build_site.sh", builder)
-    (checkout / "web").mkdir()
+    (checkout / "web").mkdir(parents=True)
+    builder = checkout / "web/build_site.sh"
+    shutil.copyfile(source / "web/build_site.sh", builder)
     for file in ("index.html", "shared.js"):
         shutil.copyfile(source / "web" / file, checkout / "web" / file)
     logs = checkout / PROJECT / "logs"

@@ -9,7 +9,7 @@ from urllib.error import HTTPError
 from urllib.request import urlopen
 
 
-PUBLISHED_LOGS = "https://soobrosa.info/bullwhip/examples/github-health/logs"
+PUBLISHED_LOGS = "https://soobrosa.info/bullwhip/pipeline/examples/github-health/logs"
 TRENDING_SOURCE = "https://github.com/trending"
 
 

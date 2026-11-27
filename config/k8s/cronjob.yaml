@@ -1,5 +1,5 @@
 # Kubernetes version of the nightly: a CronJob that runs the same image and
-# the same lib/run_workflow.sh as cron / GitHub Actions.
+# the same pipeline/lib/run_workflow.sh as cron / GitHub Actions.
 #
 # STATUS: written from the Docker image and the Action, validated as YAML,
 # NOT yet applied to a cluster.  Treat as a starting point.
@@ -19,7 +19,7 @@
 # Before applying:
 #   docker build -t ghcr.io/<you>/bullwhip:latest . && docker push ...
 #   kubectl create secret generic bullwhip --from-literal=github-token=ghp_...
-#   kubectl apply -f deploy/k8s/cronjob.yaml
+#   kubectl apply -f config/k8s/cronjob.yaml
 #   kubectl create job --from=cronjob/bullwhip bullwhip-now   # try one night
 #
 # Paths inside the image: the Dockerfile copies the repo to /app.  The warehouse
@@ -63,7 +63,7 @@ spec:
               image: ghcr.io/<you>/bullwhip:latest
               imagePullPolicy: Always
               workingDir: /app
-              command: ["bash", "lib/run_workflow.sh"]
+              command: ["bash", "pipeline/lib/run_workflow.sh"]
               env:
                 - name: BULLWHIP_FAIL_FAST
                   value: "1"
@@ -86,7 +86,7 @@ spec:
                 - name: data
                   mountPath: /data
                 - name: data
-                  mountPath: /app/examples/github-health/logs
+                  mountPath: /app/pipeline/examples/github-health/logs
                   subPath: logs
               resources:
                 requests: { cpu: "500m", memory: "1Gi" }
@@ -99,7 +99,7 @@ spec:
 # Optional: the dashboards, reading the same volume.  Plain http.server from
 # /app, exactly like `python3 -m http.server 8765 -d .` locally.
 #   kubectl port-forward deploy/bullwhip-web 8765:8765
-#   open http://localhost:8765/web/f.html?project=examples/github-health
+#   open http://localhost:8765/web/f.html?project=pipeline/examples/github-health
 # See the RWO note on the claim above.
 apiVersion: apps/v1
 kind: Deployment
@@ -122,7 +122,7 @@ spec:
             - containerPort: 8765
           volumeMounts:
             - name: data
-              mountPath: /app/examples/github-health/logs
+              mountPath: /app/pipeline/examples/github-health/logs
               subPath: logs
               readOnly: true
           resources:

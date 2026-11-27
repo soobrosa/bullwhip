@@ -14,7 +14,7 @@ from unittest import mock
 import pytest
 
 # Ensure lib is importable.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline" / "lib"))
 
 import run_pipeline  # noqa: E402
 

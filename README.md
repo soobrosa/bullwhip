@@ -139,9 +139,9 @@ cp config/duckdb.sh.sample config/duckdb.sh
 # Edit config/duckdb.sh: set DUCKDB_PATH and DATABASE
 ```
 
-The ingested data ships as Parquet under `data/` (a few KiB, committed).  The
-DuckDB warehouse is ephemeral — gitignored, rebuilt from `data/` whenever it
-is missing — so the first `make imports` in `examples/github-health/` (or
+The ingested data ships as Parquet under `pipeline/data/` (a few KiB, committed).  The
+DuckDB warehouse is ephemeral — gitignored, rebuilt from `pipeline/data/` whenever it
+is missing — so the first `make imports` in `pipeline/examples/github-health/` (or
 `make restore`) recreates it and `query.py` works immediately. `logs/` is
 ignored, so the dashboards need at least one local or Actions night.
 
@@ -149,10 +149,10 @@ ignored, so the dashboards need at least one local or Actions night.
 
 ```bash
 # Run the workflow manually:
-bash lib/run_workflow.sh
+bash pipeline/lib/run_workflow.sh
 
 # Or set up cron:
-# */30 0-5 * * * bash /path/to/project/lib/run_workflow.sh
+# */30 0-5 * * * bash /path/to/project/pipeline/lib/run_workflow.sh
 
 # Or let GitHub Actions be the cron: .github/workflows/nightly.yml runs the
 # same script at 03:00 UTC daily, keeps warehouse + dlt state + logs in the
@@ -165,7 +165,7 @@ bash lib/run_workflow.sh
 The dashboards are live on GitHub Pages, rebuilt from the latest night's
 artifacts by every run of `nightly.yml`:
 
-[picker](https://soobrosa.info/bullwhip/web/index.html?project=examples/github-health)
+[picker](https://soobrosa.info/bullwhip/web/index.html?project=pipeline/examples/github-health)
 · [a](https://soobrosa.info/bullwhip/web/a.html)
 · [b](https://soobrosa.info/bullwhip/web/b.html)
 · [c](https://soobrosa.info/bullwhip/web/c.html)
@@ -196,7 +196,7 @@ browser via `?project=<dir>&date=<date>`:
 
 `BULLWHIP_LIVE_UI=1` starts the same server automatically during the night.
 The pages use relative paths and `logs/index.json` for the night picker, so
-`scripts/build_site.sh` can drop them on any static host (the Action does this
+`web/build_site.sh` can drop them on any static host (the Action does this
 for GitHub Pages). Real screenshots from genuine runs are in `docs/visuals/`.
 
 ### 5. Agent access
@@ -214,26 +214,26 @@ for GitHub Pages). Real screenshots from genuine runs are in `docs/visuals/`.
 
 ## The components
 
-### lib/ — the scheduler skeleton
+### pipeline/lib/ — the scheduler skeleton
 
 - **`run_workflow.sh`** — cron entry point. Single-flight, bounded attempts (default 23), attempt logs, `status.json` heartbeat.
 - **`boilerplate.mk`** — included by user Makefiles. Dated targets, the tracking shell, extensible `scaffold`/`nuke`/`cleanup`/`backup` targets.
 - **`tracking_shell.py`** — vendored, self-contained. Wraps every make recipe: tees output to per-target logs, writes BEGIN/END JSON to `timing_env.log`. No external dependencies.
 
-### lib/ — the workers
+### pipeline/lib/ — the workers
 
 - **`run_pipeline.py`** — thin dlt wrapper CLI, kept as a fallback for simple cases. The primary EL path is `dlt-ops pipeline run`.
 - **`connections.py`** — connector registry. DuckDB, MotherDuck, BigQuery, ClickHouse. One config file per connector, same `export KEY="VAL"` convention.
 - **`dlt_ops_fallback.py`** — escape hatch only. If `dlt-ops` ever breaks, swap `dlt-ops pipeline run` for this in the makefile. Deliberately incomplete — the full feature set is why we depend on `dlt-ops`.
-- **`warehouse_parquet.py`** — export/restore. `export` writes the dataset's raw tables to `data/*.parquet` (the durable copy, run nightly as `backup`); `restore` rebuilds the ephemeral warehouse from them when the file is missing.
+- **`warehouse_parquet.py`** — export/restore. `export` writes the dataset's raw tables to `pipeline/data/*.parquet` (the durable copy, run nightly as `backup`); `restore` rebuilds the ephemeral warehouse from them when the file is missing.
 
-### lib/ — the Mara organs
+### pipeline/lib/ — the Mara organs
 
 - **`critical_path.py`** — parses the make DAG (`make -pnr`), reads historical durations from `timing_env.log` (summed per target per night), computes longest-downstream-path per target, emits `dag.json` (shared with the UI) and `.WAIT` waves (requires gmake >= 4.4).
 - **`fingerprint.py`** — SHA-256 over (recipe + content deps). Stored beside each dated marker. A boilerplate helper refreshes the marker and exits 0 when unchanged. Fixes the silent failure where re-running with edited logic no-ops against yesterday's marker.
 - **`run_ledger.py`** — the outcome record. After make finishes, snapshots `dlt-ops pipeline status --json` (runs, records extracted/loaded, errors) and DuckDB row counts into `logs/<date>/ledger.json`. Answers "did the data arrive", not just "did make exit 0".
 
-### sqlmesh/ — the transform layer
+### pipeline/sqlmesh/ — the transform layer
 
 - **`config.yaml`** — one gateway per connector, reusing config files for credentials. The nightly recipe runs `plan --no-prompts --auto-apply` (bootstrap, no-op when unchanged) followed by `run` (evaluate completed intervals).
 - **`models/`** — SQL models with audits. Replace the old ERB SQL templates.
@@ -271,7 +271,7 @@ The status and stats surfaces have direct parity:
 | `logs/<date>/status.json` | `night_status(date?)` (same fields, plus derived heartbeat age and liveness) |
 | `logs/<date>/ledger.json` | `night_stats(date?)` (same runs, record counts, table counts, and errors) |
 
-### lib/ — notifications
+### pipeline/lib/ — notifications
 
 - **`notify_slack.py`** — v0 failure ping (stdlib webhook, zero deps) + v1 morning digest with per-target duration vs. historical average. The webhook URL is the credential: locally set `SLACK_WEBHOOK_URL` in `config/bullwhip.sh`; on GitHub Actions it comes from the `SLACK_WEBHOOK_URL` secret (already wired in `nightly.yml`, a silent no-op until the secret exists).
 
@@ -303,15 +303,15 @@ Three ways to schedule the night; the container image builds itself.
 |---|---|---|
 | GitHub Actions (`.github/workflows/nightly.yml`) | primary, verified locally | just push; optionally the `SLACK_WEBHOOK_URL` secret |
 | Host cron | works as documented | a crontab line |
-| Kubernetes CronJob (`deploy/k8s/cronjob.yaml`) | written, not applied | an image in a registry |
+| Kubernetes CronJob (`config/k8s/cronjob.yaml`) | written, not applied | an image in a registry |
 
 `.github/workflows/docker.yml` runs on every push to `main`: it checks whether
 `ghcr.io/<owner>/<repo>:latest` exists and, only when missing, builds and
 pushes it (plus a SHA-pinned tag) using the workflow's own `GITHUB_TOKEN` with
 `packages: write`. Nothing to configure. Keep the `image:` in
-`deploy/k8s/cronjob.yaml` pointing at the same `ghcr.io/<owner>/<repo>` name.
+`config/k8s/cronjob.yaml` pointing at the same `ghcr.io/<owner>/<repo>` name.
 
-`data/*.parquet` is the durable copy of the ingested data; `warehouse.duckdb`
+`pipeline/data/*.parquet` is the durable copy of the ingested data; `warehouse.duckdb`
 is rebuilt from it whenever missing, so a cache eviction or fresh clone costs
 a re-ingest (the sources merge on primary keys, so it's idempotent) plus a
 model refresh — not data loss.
@@ -323,7 +323,7 @@ What bullwhip descends from and what it took:
 | Ancestor | What bullwhip took | Link |
 |---|---|---|
 | **night-shift** (soobrosa) | The whole shape: cron + make, `run_workflow.sh` (single-flight, bounded attempts, attempt logs), `boilerplate.mk`, dated `intermediate/<date>/` markers, `timing_env.log`, `attempt_log_sizes.py`, the Flask UI's Gantt and log-debugging views (option A, carried into E and F) | https://github.com/soobrosa/night-shift |
-| **trackingshell** (Wunderlist) | `lib/tracking_shell.py` is a self-contained rewrite of its make-shell idea: wrap every recipe, tee per-target logs, BEGIN/END records | https://github.com/wunderlist/trackingshell |
+| **trackingshell** (Wunderlist) | `pipeline/lib/tracking_shell.py` is a self-contained rewrite of its make-shell idea: wrap every recipe, tee per-target logs, BEGIN/END records | https://github.com/wunderlist/trackingshell |
 | **Mara** (mara-pipelines) | The three "organs": critical-path priority for make (`critical_path.py`), content-hash cache keys (`fingerprint.py`), and the outcome record "task success is not data success" (`run_ledger.py`, dashboard C) | https://github.com/mara/mara-pipelines |
 | **dataroom** (soobrosa) | The monochrome dashboard language of D, E and F: tokens, hairline grid, progress/NOW hero, vitals cells, hatched running bars, tree + preview | https://github.com/soobrosa/dataroom |
 

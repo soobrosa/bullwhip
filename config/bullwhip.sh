@@ -1,7 +1,7 @@
 # bullwhip configuration — sourced by run_workflow.sh.
 # Drives the github-health example on fixture data.
 
-export BULLWHIP_PROJECT_DIR="examples/github-health"
+export BULLWHIP_PROJECT_DIR="pipeline/examples/github-health"
 export BULLWHIP_TARGETS="imports"
 export BULLWHIP_FAILURE_TARGETS="backup"
 export BULLWHIP_PARALLEL_JOBS=4

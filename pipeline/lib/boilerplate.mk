@@ -20,7 +20,9 @@ endif
 TMP_OUT = $@.$(TMP_TOKEN).tmp
 
 # The tracking shell wraps every recipe command for logging + timing.
-SHELL := ./lib/tracking_shell.py --target $@ --date $(TODAY)
+# Default assumes make runs from the repo root; example makefiles under
+# pipeline/examples/*/ override this with their own relative path.
+SHELL := pipeline/lib/tracking_shell.py --target $@ --date $(TODAY)
 
 .PHONY: all nuke scaffold backup clean-test cleanup list-all-targets
 
@@ -56,16 +58,17 @@ backup::
 
 # --- fingerprint marker convention ---
 # Content-hash gating for targets whose inputs aren't file-mtimes (exports,
-# backups, notifications).  lib/fingerprint.py --check exits 0 (and refreshes
+# backups, notifications).  pipeline/lib/fingerprint.py --check exits 0 (and
+# refreshes
 # the marker) when recipe+deps are unchanged, 1 when they changed, so the
 # check and the real work must share one shell (`|| { ... }`) — make runs
 # each recipe line in its own shell and a bare `exit 0` cannot skip the rest:
 #   target:
-#   	@python lib/fingerprint.py --check --target $@ \
+#   	@python pipeline/lib/fingerprint.py --check --target $@ \
 #   		--recipe "the command" --deps "a.py b.sql" \
 #   	|| { \
 #   		the actual recipe; \
-#   		python lib/fingerprint.py --write --target $@ \
+#   		python pipeline/lib/fingerprint.py --write --target $@ \
 #   			--recipe "the command" --deps "a.py b.sql"; \
 #   	}
-# See lib/fingerprint.py for details.
+# See pipeline/lib/fingerprint.py for details.

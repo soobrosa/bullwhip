@@ -18,7 +18,7 @@ node_modules/
 dist/
 *.duckdb.wal
 .sqlmesh/
-sqlmesh/.cache/
-sqlmesh/logs/
+pipeline/sqlmesh/.cache/
+pipeline/sqlmesh/logs/
 .pytest_cache/
 .coverage

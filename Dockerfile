@@ -28,7 +28,7 @@ RUN pip install --no-cache-dir -e ".[duckdb]" || pip install --no-cache-dir "dlt
 COPY . /app
 
 # Make scripts executable.
-RUN chmod +x lib/run_workflow.sh lib/tracking_shell.py
+RUN chmod +x pipeline/lib/run_workflow.sh pipeline/lib/tracking_shell.py
 
 # Default command — run the workflow.
-CMD ["bash", "lib/run_workflow.sh"]
+CMD ["bash", "pipeline/lib/run_workflow.sh"]

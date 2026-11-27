@@ -1,13 +1,13 @@
 # nightly.yml — run the night on GitHub Actions instead of cron.
 #
-# Same entry point as cron (lib/run_workflow.sh), same config
+# Same entry point as cron (pipeline/lib/run_workflow.sh), same config
 # (config/bullwhip.sh), but:
 #   - retries happen in-process (BULLWHIP_FAIL_FAST=1, three tries a minute
 #     apart) instead of across half-hourly cron ticks;
 #   - dlt state and past nights' logs live in the Actions cache between runs
 #     (best effort: an evicted cache means a cold state); the warehouse is
-#     NOT cached — data/*.parquet is the durable copy and every run rebuilds
-#     warehouse.duckdb from it;
+#     NOT cached — pipeline/data/*.parquet is the durable copy and every run
+#     rebuilds warehouse.duckdb from it;
 #   - secrets come from the environment, never from .dlt/secrets.toml;
 #   - the dashboards plus every night's artifacts are published to GitHub
 #     Pages when Pages is enabled for the repository (Settings → Pages →
@@ -40,7 +40,7 @@ permissions:
   contents: read
 
 env:
-  PROJECT_DIR: examples/github-health
+  PROJECT_DIR: pipeline/examples/github-health
 
 jobs:
   night:
@@ -92,7 +92,7 @@ jobs:
         run: |
           set +e
           for i in 0 1 2; do
-            bash lib/run_workflow.sh && exit 0
+            bash pipeline/lib/run_workflow.sh && exit 0
             echo "::warning::attempt $i failed (make exit != 0)"
             [ "$i" -lt 2 ] && sleep 60
           done
@@ -151,7 +151,7 @@ jobs:
 
       - name: Build dashboards site
         if: always()
-        run: bash scripts/build_site.sh "$PROJECT_DIR" site
+        run: bash web/build_site.sh "$PROJECT_DIR" site
 
       - name: Upload Pages artifact
         if: always()

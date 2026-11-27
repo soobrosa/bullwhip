@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 # Ensure lib is importable.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline" / "lib"))
 
 
 def test_timing_record_format():
@@ -48,7 +48,7 @@ def test_tracking_shell_executes_command():
         result = subprocess.run(
             [
                 sys.executable,
-                str(Path(__file__).resolve().parent.parent / "lib" / "tracking_shell.py"),
+                str(Path(__file__).resolve().parent.parent / "pipeline" / "lib" / "tracking_shell.py"),
                 "--target", "test_target",
                 "--date", date,
                 "echo", "hello",
@@ -86,7 +86,7 @@ def test_tracking_shell_preserves_exit_code():
         result = subprocess.run(
             [
                 sys.executable,
-                str(Path(__file__).resolve().parent.parent / "lib" / "tracking_shell.py"),
+                str(Path(__file__).resolve().parent.parent / "pipeline" / "lib" / "tracking_shell.py"),
                 "--target", "failing_target",
                 "--date", date,
                 "false",  # always exits 1

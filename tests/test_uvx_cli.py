@@ -46,11 +46,11 @@ def test_uvx_demo(tmp_path, directory):
         "duckdb/duckdb", "tikv/tikv", "ibis-project/ibis",
     ]
     nodes = {target["id"]: target["deps"] for target in result["dag"]["targets"]}
-    assert "../../warehouse.duckdb" in nodes
+    assert "../../../warehouse.duckdb" in nodes
     assert f"intermediate/{result['date']}/sqlmesh.done" in nodes["imports"]
     assert not outside_db.exists()
     assert not (root / ".dlt/secrets.toml").exists()
-    assert (root / "data/contributors.parquet").is_file()
+    assert (root / "pipeline/data/contributors.parquet").is_file()
 
     attempt = Path(result["logs"]) / "attempt-00.log"
     timing = Path(result["logs"]) / "timing_env.log"
