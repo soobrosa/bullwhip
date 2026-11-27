@@ -362,6 +362,17 @@ Dashboards and agent access:
 Dev only: `pytest`, `pytest-cov`, TypeScript + `@types/node` (mcp), Homebrew
 `make` (GNU 4.4 on macOS), headless Chrome (the screenshots in `docs/visuals/`).
 
+## Project docs
+
+- [Kickoff prompt](docs/kickoff-prompt.md): What to paste into a coding agent
+  to start from an empty repo.
+- [Build specification](docs/build-spec.md): Requirements and acceptance
+  checks for building Bullwhip from scratch.
+- [AGENTS.md](AGENTS.md): Instructions for coding agents working in this repo.
+
+For usage, see the [LLM-readable guide](llms.txt) or the
+[pipeline tutorial](docs/tutorial.md).
+
 ## Testing
 
 ```bash
